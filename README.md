@@ -12,6 +12,7 @@ Chạy: bấm đúp `start.bat` (hoặc `node server.js`). Không cần cài th�
 - **Nhạc nền + âm thanh** kiểu Phục Hưng (tự tổng hợp, không cần file), hoạt ảnh thẻ/đá bay, pháo giấy khi thắng. Nút 🎵 🔔 góc dưới phải.
 - **Đồng hồ lượt** (chủ phòng chọn 45–180 giây; hết giờ máy đi thay), nút **⏰ Nhắc** người đang suy nghĩ lâu.
 - **Chat + emoji**, **lịch sử nước đi**, **bảng thành tích nhóm**, **Ván mới** ngay cùng nhóm.
+- **Tuỳ chỉnh (nút ⚙️)**: 5 kiểu bàn, 4 bộ bài, chọn ảnh gốc hoặc tranh vẽ, 4 bản nhạc + chỉnh âm lượng. Màn kết quả có bục điểm, biểu đồ theo vòng, danh hiệu, pháo hoa khi thắng.
 - Thông báo đến lượt: nhấp nháy tiêu đề, rung điện thoại, 📣 bật thông báo trình duyệt khi ở tab khác.
 
 ## Deploy lên Render (miễn phí)

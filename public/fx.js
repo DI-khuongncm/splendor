@@ -24,8 +24,8 @@ const FX = (function () {
     master = ctx.createGain(); master.gain.value = 0.9;
     const comp = ctx.createDynamicsCompressor(); comp.threshold.value = -16; comp.ratio.value = 4;
     master.connect(comp); comp.connect(ctx.destination);
-    musicBus = ctx.createGain(); musicBus.gain.value = musicOn ? 0.5 : 0;
-    sfxBus = ctx.createGain(); sfxBus.gain.value = sfxOn ? 1 : 0;
+    musicBus = ctx.createGain(); musicBus.gain.value = musicOn ? musicVol : 0;
+    sfxBus = ctx.createGain(); sfxBus.gain.value = sfxOn ? sfxVol : 0;
     verb = ctx.createConvolver(); verb.buffer = impulse(2.4, 2.6);
     const vg = ctx.createGain(); vg.gain.value = 0.42; verb.connect(vg); vg.connect(master);
     musicBus.connect(master); musicBus.connect(verb);
@@ -84,35 +84,59 @@ const FX = (function () {
     n.connect(hp); hp.connect(g); g.connect(bus); n.start(t); n.stop(t + 0.1);
   }
 
-  // --- bản nhạc: điệu pavane giọng Rê Dorian, 8 ô nhịp, lặp lại (lượt chẵn: sáo; lượt lẻ: đàn luýt) ---
-  const BPM = 74, BEAT = 60 / BPM;
-  const CH = [[50, 57, 62, 65], [48, 55, 60, 64], [46, 53, 58, 62], [45, 52, 57, 61], [50, 57, 62, 65], [41, 53, 60, 65], [48, 55, 60, 64], [45, 52, 57, 61]];
-  const ARP = [0, 2, 1, 3, 2, 3, 1, 2];
-  const MEL = [
-    [[69, 0, 1.5], [74, 1.5, .5], [72, 2, 1], [70, 3, 1]],
-    [[69, 0, 2], [67, 2, 1], [69, 3, 1]],
-    [[70, 0, 1.5], [69, 1.5, .5], [67, 2, 1], [65, 3, 1]],
-    [[64, 0, 1], [65, 1, 1], [61, 2, 1], [64, 3, 1]],
-    [[74, 0, 2], [72, 2, 1], [74, 3, 1]],
-    [[77, 0, 1.5], [76, 1.5, .5], [74, 2, 1], [72, 3, 1]],
-    [[72, 0, 1], [74, 1, 1], [76, 2, 2]],
-    [[77, 0, 1], [76, 1, 1], [73, 2, 1], [69, 3, 1]],
+  // --- các bản nhạc (mỗi bản 8 ô nhịp 4/4, lặp lại) ---
+  const A8 = [0, 2, 1, 3, 2, 3, 1, 2];
+  const TRACKS = [
+    { id: 'pavane', name: 'Pavane buổi sớm', desc: 'Chậm rãi, sáo và đàn luýt', bpm: 74, lead: 'alt', pad: 0.035,
+      chords: [[50, 57, 62, 65], [48, 55, 60, 64], [46, 53, 58, 62], [45, 52, 57, 61], [50, 57, 62, 65], [41, 53, 60, 65], [48, 55, 60, 64], [45, 52, 57, 61]],
+      arp: { pat: A8, dur: 1.6 }, drum: [[0, .1, 85], [2, .07, 95]], shk: [[1, .03], [3, .03], [2.5, .018]],
+      mel: [
+        [[69, 0, 1.5], [74, 1.5, .5], [72, 2, 1], [70, 3, 1]], [[69, 0, 2], [67, 2, 1], [69, 3, 1]],
+        [[70, 0, 1.5], [69, 1.5, .5], [67, 2, 1], [65, 3, 1]], [[64, 0, 1], [65, 1, 1], [61, 2, 1], [64, 3, 1]],
+        [[74, 0, 2], [72, 2, 1], [74, 3, 1]], [[77, 0, 1.5], [76, 1.5, .5], [74, 2, 1], [72, 3, 1]],
+        [[72, 0, 1], [74, 1, 1], [76, 2, 2]], [[77, 0, 1], [76, 1, 1], [73, 2, 1], [69, 3, 1]]] },
+    { id: 'galliard', name: 'Galliard hội làng', desc: 'Nhanh, vui, đàn luýt dẫn', bpm: 104, lead: 'lute', pad: 0.025,
+      chords: [[45, 52, 57, 60], [43, 50, 55, 59], [41, 48, 53, 57], [40, 47, 52, 56], [45, 52, 57, 60], [43, 50, 55, 59], [41, 48, 53, 57], [40, 47, 52, 56]],
+      arp: { pat: A8, dur: 1.2 }, drum: [[0, .11, 90], [1, .05, 110], [2, .09, 90], [3, .05, 110]], shk: [[.5, .03], [1.5, .03], [2.5, .03], [3.5, .03]],
+      mel: [
+        [[69, 0, 1], [72, 1, .5], [71, 1.5, .5], [69, 2, 1], [64, 3, 1]], [[67, 0, 1], [71, 1, .5], [69, 1.5, .5], [67, 2, 1], [62, 3, 1]],
+        [[65, 0, 1], [69, 1, 1], [72, 2, 1], [69, 3, 1]], [[68, 0, 1], [71, 1, 1], [76, 2, 1.5], [71, 3.5, .5]],
+        [[76, 0, 2], [72, 2, 1], [69, 3, 1]], [[74, 0, 2], [71, 2, 1], [67, 3, 1]],
+        [[72, 0, 1.5], [69, 1.5, .5], [65, 2, 2]], [[68, 0, 1], [71, 1, 1], [68, 2, 1], [64, 3, 1]]] },
+    { id: 'nightcastle', name: 'Đêm lâu đài', desc: 'Êm dịu, sáo ngân dài', bpm: 58, lead: 'flute', pad: 0.05,
+      chords: [[41, 48, 53, 57], [48, 55, 60, 64], [50, 57, 62, 65], [46, 53, 58, 62], [41, 48, 53, 57], [45, 52, 57, 60], [46, 53, 58, 62], [48, 55, 60, 64]],
+      arp: { pat: [0, 2, 1, 3], dur: 3 }, drum: [[0, .05, 70]], shk: [],
+      mel: [
+        [[69, 0, 2], [72, 2, 2]], [[76, 0, 3], [74, 3, 1]], [[74, 0, 2], [69, 2, 2]], [[70, 0, 2], [74, 2, 2]],
+        [[72, 0, 4]], [[69, 0, 2], [76, 2, 2]], [[74, 0, 2], [70, 2, 2]], [[72, 0, 3], [67, 3, 1]]] },
+    { id: 'tarantella', name: 'Tarantella quảng trường', desc: 'Dồn dập, sáo và luýt cùng chơi', bpm: 126, lead: 'both', pad: 0.02,
+      chords: [[50, 57, 62, 65], [48, 55, 60, 64], [50, 57, 62, 65], [48, 55, 60, 64], [46, 53, 58, 62], [48, 55, 60, 64], [45, 52, 57, 61], [50, 57, 62, 65]],
+      arp: { pat: A8, dur: 0.9 }, drum: [[0, .12, 90], [1, .06, 120], [2, .1, 90], [3, .06, 120]], shk: [[.5, .035], [1.5, .035], [2.5, .035], [3.5, .035]],
+      mel: [
+        [[74, 0, .5], [77, .5, .5], [81, 1, 1], [77, 2, .5], [74, 2.5, .5], [72, 3, 1]], [[76, 0, .5], [72, .5, .5], [79, 1, 1], [76, 2, 1], [72, 3, 1]],
+        [[74, 0, .5], [77, .5, .5], [81, 1, 1], [77, 2, .5], [74, 2.5, .5], [72, 3, 1]], [[72, 0, 1], [76, 1, 1], [79, 2, 2]],
+        [[74, 0, 1], [70, 1, 1], [77, 2, 1], [74, 3, 1]], [[76, 0, 1], [79, 1, 1], [84, 2, 1], [79, 3, 1]],
+        [[73, 0, 1], [76, 1, 1], [81, 2, 1], [76, 3, 1]], [[77, 0, 1], [74, 1, 1], [69, 2, 2]]] },
   ];
+  let trackId = store.get('splendor_track', 'pavane'), musicVol = store.get('splendor_mvol', 0.5), sfxVol = store.get('splendor_svol', 1);
+  const curTrack = () => TRACKS.find((t) => t.id === trackId) || TRACKS[0];
   let loopNo = 0, nextT = 0, bar = 0, timer = 0;
   function scheduleBar(t, b, lp) {
-    const ch = CH[b];
-    pad(musicBus, t, [ch[0], ch[1]], BEAT * 4.2, 0.035);
-    for (let i = 0; i < 8; i++) pluck(musicBus, t + i * BEAT / 2, ch[ARP[i]] + (ARP[i] > 1 ? 0 : 0), BEAT * 1.6, i % 4 === 0 ? 0.2 : 0.12, 5);
+    const tr = curTrack(), BEAT = 60 / tr.bpm, ch = tr.chords[b], n = tr.arp.pat.length, step = (4 / n) * BEAT;
+    pad(musicBus, t, [ch[0], ch[1]], BEAT * 4.2, tr.pad);
+    for (let i = 0; i < n; i++) pluck(musicBus, t + i * step, ch[tr.arp.pat[i]], BEAT * tr.arp.dur, i % Math.max(1, n / 2) === 0 ? 0.2 : 0.12, 5);
     pluck(musicBus, t, ch[0] - 12, BEAT * 3, 0.16, 3);
-    drum(musicBus, t, 0.1, 85); drum(musicBus, t + BEAT * 2, 0.07, 95);
-    shaker(musicBus, t + BEAT, 0.03); shaker(musicBus, t + BEAT * 3, 0.03); shaker(musicBus, t + BEAT * 2.5, 0.018);
-    for (const [m, s, d] of MEL[b]) {
-      if (lp % 2 === 0) flute(musicBus, t + s * BEAT, m, d * BEAT * 0.98, 0.1);
-      else { pluck(musicBus, t + s * BEAT, m + 12, BEAT * Math.max(d, 1.2), 0.15, 6); pluck(musicBus, t + s * BEAT + 0.012, m, BEAT * d, 0.07, 4); }
+    for (const [bt, v, f] of tr.drum) drum(musicBus, t + bt * BEAT, v, f);
+    for (const [bt, v] of tr.shk) shaker(musicBus, t + bt * BEAT, v);
+    for (const [m, s0, d] of tr.mel[b]) {
+      const mode = tr.lead === 'alt' ? (lp % 2 === 0 ? 'flute' : 'lute') : tr.lead;
+      if (mode === 'flute' || mode === 'both') flute(musicBus, t + s0 * BEAT, m, d * BEAT * 0.98, mode === 'both' ? 0.08 : 0.1);
+      if (mode === 'lute' || mode === 'both') { pluck(musicBus, t + s0 * BEAT, m + 12, BEAT * Math.max(d, 1.2), 0.15, 6); pluck(musicBus, t + s0 * BEAT + 0.012, m, BEAT * d, 0.07, 4); }
     }
   }
   function musicTick() {
     if (!ctx || !musicOn) return;
+    const BEAT = 60 / curTrack().bpm;
     while (nextT < ctx.currentTime + 1.2) {
       try { scheduleBar(nextT, bar, loopNo); } catch (e) { console.warn('music', e); }
       nextT += BEAT * 4; bar++; if (bar >= 8) { bar = 0; loopNo++; }
@@ -120,7 +144,7 @@ const FX = (function () {
   }
   function startMusic() {
     if (!ctx || timer) return;
-    nextT = ctx.currentTime + 0.15; bar = 0;
+    nextT = ctx.currentTime + 0.15; bar = 0; loopNo = 0;
     timer = setInterval(musicTick, 300); musicTick();
   }
   function stopMusicTimer() { clearInterval(timer); timer = 0; }
@@ -134,7 +158,7 @@ const FX = (function () {
   document.addEventListener('visibilitychange', () => { // tab ẩn: tắt nhạc nền nhưng vẫn phát chuông báo lượt
     if (!ctx) return;
     if (document.hidden) { stopMusicTimer(); musicBus.gain.setTargetAtTime(0, ctx.currentTime, 0.1); }
-    else { ctx.resume(); if (musicOn) { musicBus.gain.setTargetAtTime(0.5, ctx.currentTime, 0.3); startMusic(); } }
+    else { ctx.resume(); if (musicOn) { musicBus.gain.setTargetAtTime(musicVol, ctx.currentTime, 0.3); startMusic(); } }
   });
 
   // --- hiệu ứng âm thanh ---
@@ -172,6 +196,12 @@ const FX = (function () {
     turn() { const t = ctx.currentTime; ring(t, mtof(81), .1, 1.1, [[1, 1], [2, .3], [3, .1]]); ring(t + .17, mtof(86), .11, 1.4, [[1, 1], [2, .3], [3, .1]]); },
     error() { const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(80, t + .18);
       g.gain.setValueAtTime(.18, t); g.gain.exponentialRampToValueAtTime(.0001, t + .22); o.connect(g); g.connect(sfxBus); o.start(t); o.stop(t + .25); },
+    firework() { const t = ctx.currentTime; swish(t, .3, 400, 2400, .08);
+      const n = ctx.createBufferSource(); n.buffer = noiseBuf(); const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 700;
+      const g = ctx.createGain(); g.gain.setValueAtTime(0.0001, t + .28); g.gain.linearRampToValueAtTime(.18, t + .3); g.gain.exponentialRampToValueAtTime(.0001, t + .9);
+      n.connect(lp); lp.connect(g); g.connect(sfxBus); n.start(t); n.stop(t + 1);
+      for (let i = 0; i < 5; i++) ring(t + .32 + i * .05 + Math.random() * .05, rnd(2400, 4200), .035, .3, [[1, 1]]); },
+    coin() { const t = ctx.currentTime; ring(t, rnd(1800, 2600), .06, .5); },
     chat() { const t = ctx.currentTime; ring(t, 1568, .07, .25, [[1, 1], [2, .3]]); ring(t + .09, 2093, .06, .3, [[1, 1], [2, .3]]); },
     nudge() { const t = ctx.currentTime; for (let i = 0; i < 3; i++) ring(t + i * .22, mtof(88), .12, .8, [[1, 1], [2, .3], [3, .1]]); },
     tick() { const t = ctx.currentTime; ring(t, 880, .08, .12, [[1, 1]]); },
@@ -187,10 +217,22 @@ const FX = (function () {
 
   function setMusic(on) {
     musicOn = on; store.set('splendor_music', on); if (!init()) return;
-    musicBus.gain.setTargetAtTime(on ? 0.5 : 0, ctx.currentTime, 0.25);
+    musicBus.gain.setTargetAtTime(on ? musicVol : 0, ctx.currentTime, 0.25);
     if (on) { if (ctx.state === 'suspended') ctx.resume(); started = true; if (!timer) startMusic(); } else stopMusicTimer();
   }
-  function setSfx(on) { sfxOn = on; store.set('splendor_sfx', on); if (ctx) sfxBus.gain.value = on ? 1 : 0; }
+  function setSfx(on) { sfxOn = on; store.set('splendor_sfx', on); if (ctx) sfxBus.gain.value = on ? sfxVol : 0; }
+  function setVolume(kind, v) {
+    v = Math.max(0, Math.min(1, v));
+    if (kind === 'music') { musicVol = v; store.set('splendor_mvol', v); if (ctx && musicOn) musicBus.gain.setTargetAtTime(v, ctx.currentTime, 0.05); }
+    else { sfxVol = v; store.set('splendor_svol', v); if (ctx && sfxOn) sfxBus.gain.value = v; }
+  }
+  function setTrack(id) { // đổi bản nhạc (tự bật nhạc nếu đang tắt)
+    if (!TRACKS.some((t) => t.id === id)) return;
+    trackId = id; store.set('splendor_track', id);
+    if (!init()) return;
+    if (!musicOn) { setMusic(true); return; }
+    stopMusicTimer(); started = true; startMusic();
+  }
 
   // ================= HOẠT ẢNH =================
   const rectOf = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return r.width ? { x: r.left, y: r.top, w: r.width, h: r.height } : null; };
@@ -323,7 +365,7 @@ const FX = (function () {
     if (isMine && (!wasMine || prev.phase !== nw.phase || prev.turn !== nw.turn)) { sfx('turn', played ? 900 : 100); flash(nw.phase === 'main' ? 'Đến lượt bạn' : 'Hành động của bạn'); }
     if (nw.phase === 'over' && prev.phase !== 'over') {
       const won = nw.winners.includes(meId);
-      sfx(won ? 'win' : 'lose', 700); if (won) confetti();
+      celebrate(won);
     }
   }
 
@@ -339,16 +381,42 @@ const FX = (function () {
   function resize() { W = cv.width = innerWidth; H = cv.height = innerHeight; }
   addEventListener('resize', resize); resize();
   for (let i = 0; i < 42; i++) dust.push({ x: Math.random() * 2000, y: Math.random() * 1200, r: 0.6 + Math.random() * 1.8, s: 0.08 + Math.random() * 0.25, p: Math.random() * 6.28, a: 0.15 + Math.random() * 0.45 });
+  const cvT = document.createElement('canvas'); cvT.id = 'fxtop'; document.body.appendChild(cvT);
+  const gt = cvT.getContext('2d'); let bursts = [], coins = [], fwTimer = 0;
+  function resizeT() { cvT.width = innerWidth; cvT.height = innerHeight; }
+  addEventListener('resize', resizeT); resizeT();
   const GEMC = ['#f4f1ea', '#4f8be9', '#3dbd71', '#e24a44', '#8a8a9c', '#f6cf3d'];
   function confetti() {
     if (reduce) return;
     for (let i = 0; i < 140; i++) confettiList.push({ x: W / 2 + (Math.random() - .5) * W * .5, y: H * 0.3, vx: (Math.random() - .5) * 9, vy: -4 - Math.random() * 9, r: 3 + Math.random() * 5, c: GEMC[i % GEMC.length], rot: Math.random() * 6, vr: (Math.random() - .5) * .3, life: 1 });
     kick();
   }
+  const FWC = ['#ffd75e', '#ff6b6b', '#6bd0ff', '#9dff8a', '#ffffff', '#d58aff'];
+  function burst(x, y) {
+    const c = FWC[Math.floor(Math.random() * FWC.length)], c2 = FWC[Math.floor(Math.random() * FWC.length)], n = 46, p = [];
+    for (let i = 0; i < n; i++) { const a = (i / n) * 6.283 + Math.random() * .2, v = 2 + Math.random() * 2.8; p.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, r: 2 + Math.random() * 1.6, c: i % 3 ? c : c2, a: 1.2 }); }
+    bursts.push({ p }); kick();
+  }
+  function fireworks(ms) {
+    if (reduce) return;
+    clearInterval(fwTimer); const end = Date.now() + (ms || 6000);
+    const go = () => { burst(W * (0.15 + Math.random() * 0.7), H * (0.12 + Math.random() * 0.4)); sfx('firework'); };
+    go(); fwTimer = setInterval(() => { if (Date.now() > end) return clearInterval(fwTimer); go(); }, 520);
+  }
+  function coinRain(n) {
+    if (reduce) return;
+    for (let i = 0; i < (n || 38); i++) coins.push({ x: Math.random() * W, y: -20 - Math.random() * H * .6, vy: 1.2 + Math.random() * 1.6, r: 6 + Math.random() * 5, rot: Math.random() * 6, vr: .06 + Math.random() * .08, ph: Math.random() * 6 });
+    kick();
+  }
+  // màn hình kết quả: thắng = pháo hoa + giấy hoa; thua = xu vàng rơi nhẹ
+  function celebrate(won) {
+    if (won) { confetti(); setTimeout(confetti, 900); fireworks(7000); sfx('win', 300); }
+    else { coinRain(34); sfx('lose', 300); for (let i = 0; i < 6; i++) sfx('coin', 700 + i * 380); }
+  }
   function kick() { if (!raf) raf = requestAnimationFrame(loop); }
   function loop(t) {
     raf = 0; if (document.hidden) { raf = requestAnimationFrame(loop); return; }
-    g2.clearRect(0, 0, W, H);
+    g2.clearRect(0, 0, W, H); gt.clearRect(0, 0, W, H);
     for (const d of dust) {
       d.y -= d.s; d.x += Math.sin(t / 2500 + d.p) * 0.2; if (d.y < -5) { d.y = H + 5; d.x = Math.random() * W; }
       const tw = 0.5 + 0.5 * Math.sin(t / 700 + d.p);
@@ -357,9 +425,25 @@ const FX = (function () {
     g2.shadowBlur = 0;
     for (const c of confettiList) {
       c.vy += 0.18; c.x += c.vx; c.y += c.vy; c.vx *= 0.99; c.rot += c.vr; if (c.y > H + 20) c.life = 0;
-      g2.save(); g2.translate(c.x, c.y); g2.rotate(c.rot); g2.fillStyle = c.c; g2.beginPath(); g2.moveTo(0, -c.r); g2.lineTo(c.r * .8, 0); g2.lineTo(0, c.r); g2.lineTo(-c.r * .8, 0); g2.closePath(); g2.fill(); g2.restore();
+      gt.save(); gt.translate(c.x, c.y); gt.rotate(c.rot); gt.fillStyle = c.c; gt.beginPath(); gt.moveTo(0, -c.r); gt.lineTo(c.r * .8, 0); gt.lineTo(0, c.r); gt.lineTo(-c.r * .8, 0); gt.closePath(); gt.fill(); gt.restore();
     }
     confettiList = confettiList.filter((c) => c.life > 0);
+    // lớp trên: pháo hoa + xu rơi (nằm trên cả màn hình kết quả)
+    gt.globalCompositeOperation = 'lighter';
+    for (const b of bursts) {
+      for (const q of b.p) {
+        q.vy += 0.045; q.vx *= 0.985; q.vy *= 0.985; q.x += q.vx; q.y += q.vy; q.a -= 0.012;
+        if (q.a > 0) { gt.beginPath(); gt.fillStyle = q.c; gt.globalAlpha = Math.min(1, q.a); gt.arc(q.x, q.y, q.r * Math.min(1, q.a + .3), 0, 6.28); gt.fill(); }
+      }
+    }
+    gt.globalAlpha = 1; gt.globalCompositeOperation = 'source-over';
+    bursts = bursts.filter((b) => b.p.some((q) => q.a > 0));
+    for (const c of coins) {
+      c.y += c.vy; c.x += Math.sin(c.y / 40 + c.ph) * 0.6; c.rot += c.vr;
+      gt.save(); gt.translate(c.x, c.y); gt.scale(Math.cos(c.rot), 1); gt.beginPath(); gt.arc(0, 0, c.r, 0, 6.28); gt.fillStyle = '#e8b923'; gt.fill(); gt.lineWidth = 1.5; gt.strokeStyle = '#7a5600'; gt.stroke();
+      gt.beginPath(); gt.arc(0, 0, c.r * .6, 0, 6.28); gt.strokeStyle = '#fff1b8'; gt.lineWidth = 1; gt.stroke(); gt.restore();
+    }
+    coins = coins.filter((c) => c.y < H + 20);
     if (!reduce) raf = requestAnimationFrame(loop);
   }
   if (!reduce) kick();
@@ -375,5 +459,5 @@ const FX = (function () {
     c.style.setProperty('--mx', (px * 100).toFixed(0) + '%'); c.style.setProperty('--my', (py * 100).toFixed(0) + '%');
   }, { passive: true });
 
-  return { floatText, ctxState: () => ctx && ctx.state, SFX_NAMES: () => Object.keys(SFX), sfx, snapshot, diff, flash, setMusic, setSfx, unlock, state: () => ({ music: musicOn, sfx: sfxOn }), confetti };
+  return { celebrate, fireworks, tracks: () => TRACKS.map((t) => ({ id: t.id, name: t.name, desc: t.desc })), setTrack, setVolume, floatText, ctxState: () => ctx && ctx.state, SFX_NAMES: () => Object.keys(SFX), sfx, snapshot, diff, flash, setMusic, setSfx, unlock, state: () => ({ music: musicOn, sfx: sfxOn, track: trackId, mvol: musicVol, svol: sfxVol }), confetti };
 })();

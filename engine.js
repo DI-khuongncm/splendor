@@ -36,16 +36,18 @@ function newGame(players, rnd = Math.random) {
   const order = shuffle(players, rnd); // người đi đầu ngẫu nhiên
   const g = {
     players: order.map((p) => ({
-      id: p.id, name: p.name, tokens: zero(), cards: [], reserved: [], nobles: [],
+      id: p.id, name: p.name, tokens: zero(), cards: [], reserved: [], nobles: [], st: { take: 0, reserve: 0, buy: 0 },
     })),
     bank, decks, board,
     nobles: shuffle(NOBLES.map((x) => x.id), rnd).slice(0, n + 1),
     turn: 0, phase: 'main', // main | discard | noble | over
-    finalRound: false, winners: null, log: [], round: 1,
+    finalRound: false, winners: null, log: [], round: 1, series: [],
   };
   addLog(g, `Ván bắt đầu. ${g.players[0].name} đi trước.`);
   return g;
 }
+
+function stat(p, k, n) { p.st = p.st || { take: 0, reserve: 0, buy: 0 }; p.st[k] = (p.st[k] || 0) + n; }
 
 function addLog(g, text) {
   g.log.push({ r: g.round, t: text });
@@ -123,6 +125,7 @@ function doMain(g, p, a) {
         if (cs.some((c) => g.bank[c] < 1)) throw new Error('Hết viên màu này');
       }
       cs.forEach((c) => { g.bank[c]--; p.tokens[c]++; });
+      stat(p, 'take', cs.length);
       addLog(g, `${p.name} lấy ${cs.map(viName).join(', ')}.`);
       break;
     }
@@ -136,6 +139,7 @@ function doMain(g, p, a) {
         id = g.decks[level].pop(); fromDeck = true;
       } else id = takeFromBoard(g, level, index);
       p.reserved.push({ id, fromDeck });
+      stat(p, 'reserve', 1);
       if (g.bank.gold > 0) { g.bank.gold--; p.tokens.gold++; }
       addLog(g, `${p.name} giữ ${fromDeck ? `1 thẻ úp cấp ${level}` : `thẻ cấp ${level}`}.`);
       break;
@@ -156,6 +160,7 @@ function doMain(g, p, a) {
       take();
       ALL.forEach((c) => { p.tokens[c] -= pay[c]; g.bank[c] += pay[c]; });
       p.cards.push(id);
+      stat(p, 'buy', 1);
       addLog(g, `${p.name} mua thẻ cấp ${CARDS[id].level} (${viName(CARDS[id].bonus)}${CARDS[id].points ? ', ' + CARDS[id].points + ' điểm' : ''}).`);
       break;
     }
@@ -221,6 +226,7 @@ function endTurn(g, p) {
   g.turn = (g.turn + 1) % g.players.length;
   g.phase = 'main';
   if (g.turn === 0) {
+    (g.series = g.series || []).push(g.players.map(points)); // điểm của từng người sau mỗi vòng (vẽ biểu đồ cuối ván)
     g.round++;
     if (g.finalRound) return finish(g);
   }
@@ -247,7 +253,7 @@ function viewFor(g, playerId) {
   return {
     players: g.players.map((p) => ({
       id: p.id, name: p.name, tokens: p.tokens, cards: p.cards, nobles: p.nobles,
-      points: points(p), bonuses: bonuses(p),
+      points: points(p), bonuses: bonuses(p), st: p.st || { take: 0, reserve: 0, buy: 0 },
       reserved: p.reserved.map((r) =>
         (p.id === playerId || !r.fromDeck) ? { id: r.id, fromDeck: r.fromDeck } : { hidden: true, level: CARDS[r.id].level }),
     })),
@@ -255,7 +261,7 @@ function viewFor(g, playerId) {
     deckCounts: { 1: g.decks[1].length, 2: g.decks[2].length, 3: g.decks[3].length },
     board: g.board, nobles: g.nobles,
     turn: g.turn, phase: g.phase, finalRound: g.finalRound, winners: g.winners,
-    log: g.log.slice(-120), round: g.round,
+    log: g.log.slice(-120), round: g.round, series: g.series || [],
     eligible: g.phase === 'noble' && g.players[g.turn].id === playerId ? eligibleNobles(g, g.players[g.turn]) : [],
     canPass: g.phase === 'main' && g.players[g.turn].id === playerId && !canAct(g, g.players[g.turn]),
   };

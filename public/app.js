@@ -14,6 +14,22 @@ let disc = {};     // đá định bỏ
 let toastMsg = '', toastTimer = 0, lobbyErr = '';
 let lastTurnKey = '', fails = 0;
 let skew = 0, seenChat = null, seenNudge = null, notifyOn = false;
+const PCOL = ['#e8b923', '#4f8be9', '#e24a44', '#3dbd71'];
+const TABLES = [
+  { id: 'felt', name: 'Nỉ xanh', c1: '#22573f', c2: '#123526' }, { id: 'velvet', name: 'Nhung đỏ', c1: '#8a2436', c2: '#4a0f1b' },
+  { id: 'oak', name: 'Gỗ sồi', c1: '#946037', c2: '#5e3b1f' }, { id: 'navy', name: 'Xanh hải quân', c1: '#2a4f8a', c2: '#12274a' },
+  { id: 'marble', name: 'Cẩm thạch', c1: '#7a8190', c2: '#3f4450' },
+];
+const DECKS = [
+  { id: 'classic', name: 'Cổ điển', k: [['#2f8a55', '#103d24'], ['#c9952a', '#5e3c08'], ['#2f63c4', '#0f2350']] },
+  { id: 'royal', name: 'Hoàng gia', k: [['#7b4bb5', '#2b1650'], ['#d2a13a', '#6a4408'], ['#b3274a', '#4a0d1f']] },
+  { id: 'noir', name: 'Dạ vàng', k: [['#3d3d48', '#0d0d12'], ['#5a4a26', '#14100a'], ['#2e3a5c', '#0b0e18']] },
+  { id: 'ocean', name: 'Đại dương', k: [['#2bb3a5', '#0a3d38'], ['#3a8fd6', '#0f2f5e'], ['#6a6fe0', '#1d1f5e']] },
+];
+let prefs = { table: 'felt', deck: 'classic', art: 'photo' };
+try { Object.assign(prefs, JSON.parse(localStorage.getItem('splendor_prefs') || '{}')); } catch (e) {}
+function applyPrefs() { document.body.dataset.table = prefs.table; document.body.dataset.deck = prefs.deck; }
+applyPrefs();
 try { notifyOn = localStorage.getItem('splendor_notify') === '1' && 'Notification' in window && Notification.permission === 'granted'; } catch (e) {}
 const EMO = ['😀', '😂', '😮', '😡', '👏', '🔥'], PHRASES = ['Nhanh lên!', 'GG', 'Khá lắm!', 'Hừm…'];
 const isBotId = (id) => { const m = S && S.lobby.members.find((x) => x.id === id); return !!(m && m.bot); };
@@ -240,7 +256,7 @@ function onState() {
     if (L.nudge.to === L.me) { FX.sfx('nudge'); FX.flash(`${L.nudge.from} đang đợi bạn!`); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
   }
   const g = S.game;
-  if (!g) { modal = null; return; }
+  if (!g) { if (modal && modal.kind !== 'settings') modal = null; return; }
   const key = g.turn + ':' + g.phase + ':' + g.round;
   if (key !== lastTurnKey) {
     lastTurnKey = key; sel = []; disc = {};
@@ -248,7 +264,7 @@ function onState() {
       try { navigator.vibrate && navigator.vibrate(150); } catch (e) {}
       if (notifyOn) try { new Notification('Splendor', { body: 'Đến lượt bạn!', tag: 'splendor-turn' }); } catch (e) {}
     }
-    if (modal && modal.kind !== 'over') modal = null;
+    if (modal && !['over', 'settings', 'history'].includes(modal.kind)) modal = null;
   }
   if (g.phase === 'over' && !(modal && modal.kind === 'over') && !modal?.dismissed) modal = { kind: 'over' };
   document.title = myTurn() ? '▶ Đến lượt bạn! - Splendor' : 'Splendor';
@@ -265,9 +281,10 @@ function probeArt() {
   CARDS.forEach((c) => check('c' + c.id, `art/c${c.id}.jpg`));
   NOBLES.forEach((n) => check('n' + n.id, `art/n${n.id}.jpg`));
 }
+const useImg = (key) => prefs.art === 'photo' && !NOIMG.has(key);
 function cardHtml(id, attrs = '', cls = '') {
   const c = CARDS[id], cid = cls.includes('nocid') ? '' : `data-cid="${id}"`;
-  if (!NOIMG.has('c' + id)) return `<div class="card img b-${c.bonus} ${cls}" style="background-image:url(art/c${id}.jpg)" ${cid} ${attrs}></div>`;
+  if (useImg('c' + id)) return `<div class="card img b-${c.bonus} ${cls}" style="background-image:url(art/c${id}.jpg)" ${cid} ${attrs}></div>`;
   return `<div class="card b-${c.bonus} art-${c.level}-${c.bonus}-${id % 2} ${cls}" ${cid} ${attrs}>
     <div class="top"><span class="pts">${c.points || ''}</span>${gemSvg(c.bonus, 28)}</div>
     <div class="costs">${costCircles(c)}</div><i class="lvm">${'•'.repeat(c.level)}</i></div>`;
@@ -279,7 +296,7 @@ function backHtml(level, n, attrs = '') {
 }
 function nobleHtml(id, pick) {
   const n = NOBLES[id], pk = `${pick ? 'pick' : ''}" data-nid="${id}" ${pick ? `data-a="noble" data-id="${id}"` : ''}`;
-  if (!NOIMG.has('n' + id)) return `<div class="noble img ${pk} style="background-image:url(art/n${id}.jpg)"></div>`;
+  if (useImg('n' + id)) return `<div class="noble img ${pk} style="background-image:url(art/n${id}.jpg)"></div>`;
   return `<div class="noble nart-${id} ${pk}><div class="nside">
     <span class="np">${n.points}</span>
     <div class="nr">${COLORS.filter((c) => n.req[c]).map((c) => `<div class="cost ${c}">${n.req[c]}</div>`).join('')}</div></div></div>`;
@@ -381,7 +398,7 @@ function playerHtml(p) {
   const g = S.game, isMe = p.id === S.lobby.me, turn = cur().id === p.id && g.phase !== 'over';
   const mem = S.lobby.members.find((m) => m.id === p.id);
   const pi = g.players.indexOf(p), pcol = ['#e8b923', '#4f8be9', '#e24a44', '#3dbd71'][pi % 4];
-  let h = `<div class="pl ${turn ? 'turn' : ''}" data-pid="${p.id}" style="--pc:${pcol}"><div class="hd"><span class="av">${esc((p.name || '?').trim().charAt(0).toUpperCase())}</span><span class="dot ${mem && mem.online ? 'on' : ''}"></span>
+  let h = `<div class="pl ${turn ? 'turn' : ''}" data-pid="${p.id}" style="--pc:${pcol}"><div class="hd"><span class="av">${esc(Array.from((p.name || '?').trim())[0].toUpperCase())}</span><span class="dot ${mem && mem.online ? 'on' : ''}"></span>
     <span class="nm">${esc(p.name)}${isMe ? ' (bạn)' : ''}</span>${turn ? '<span class="tag">LƯỢT</span>' : ''}<span class="pt">${p.points}</span></div>`;
   h += `<div class="chips">${['white', 'blue', 'green', 'red', 'black', 'gold'].map((c) => p.tokens[c] ? tokHtml(c, p.tokens[c], '', 'mini') : '').join('') || '<span class="lbl">chưa có đá</span>'}</div>`;
   h += `<div class="bon">${COLORS.map((c) => p.bonuses[c] ? `<span class="bonc k-${c}" title="Bonus ${VI[c]}">${gemSvg(c, 15)}<b>${p.bonuses[c]}</b></span>` : '').join('')}<span class="bonc" title="Số thẻ đã mua">🃏 ${p.cards.length}</span>${p.nobles.length ? `<span class="bonc">👑 ${p.nobles.length}</span>` : ''}</div>`;
@@ -413,6 +430,7 @@ function renderGame() {
   return `<div class="wrap">
     <div class="topbar">${banner()}
       ${g.phase !== 'over' && !myTurn() && !isBotId(cur().id) ? '<button class="sec" data-a="nudge">⏰ Nhắc</button>' : ''}
+      ${g.phase === 'over' ? '<button data-a="showover">🏆 Kết quả</button>' : ''}
       <button class="sec" data-a="history">Lịch sử</button><button class="sec" data-a="help">Luật</button></div>
     <div class="game">
       <div class="table"><div class="board">${boardHtml()}</div>
@@ -426,8 +444,9 @@ function renderGame() {
 
 // ---------- modal ----------
 function renderModal() {
-  const g = S.game, m = me();
   if (!modal) return '';
+  if (modal.kind === 'settings') return settingsHtml();
+  const g = S.game, m = me();
   if (modal.kind === 'help') return `<div class="ov" data-a="closem"><div class="md" data-stop>
     <h3>Luật tóm tắt</h3><p style="font-size:.9rem;line-height:1.5">Mỗi lượt chọn <b>1</b> hành động:<br>
     • Lấy 3 viên khác màu; hoặc 2 viên cùng màu (khi chồng còn ≥ 4).<br>
@@ -442,15 +461,7 @@ function renderModal() {
     return `<div class="ov" data-a="closem"><div class="md wide" data-stop><h3>Lịch sử nước đi</h3><div class="hist" id="hist">${h}</div>
       <div class="mdb"><button data-a="closem">Đóng</button></div></div></div>`;
   }
-  if (modal.kind === 'over') {
-    const rows = [...g.players].sort((a, b) => b.points - a.points || a.cards.length - b.cards.length);
-    const host = S.lobby.hostId === S.lobby.me;
-    return `<div class="ov"><div class="md" data-stop><h3 style="text-align:center">🏆 Kết thúc ván</h3>
-      <table class="score" style="width:100%;margin:10px 0"><tr><td class="lbl">Người chơi</td><td class="lbl">Điểm</td><td class="lbl">Thẻ</td></tr>
-      ${rows.map((p) => `<tr class="${g.winners.includes(p.id) ? 'win' : ''}"><td>${g.winners.includes(p.id) ? '👑 ' : ''}${esc(p.name)}</td><td>${p.points}</td><td>${p.cards.length}</td></tr>`).join('')}</table>
-      ${scoreHtml()}
-      <div class="mdb"><button class="sec" data-a="closeover">Xem bàn</button>${host ? '<button data-a="rematch">Ván mới</button><button class="sec" data-a="tolobby">Về sảnh</button>' : '<div class="sub" style="flex:1;margin:0">Đợi chủ phòng bắt đầu ván mới…</div>'}</div></div></div>`;
-  }
+  if (modal.kind === 'over') return finalHtml();
   if (modal.kind === 'deck') return `<div class="ov" data-a="closem"><div class="md" data-stop>
     <h3>Giữ thẻ úp cấp ${modal.level}?</h3><p>Bạn sẽ bốc thẻ trên cùng của chồng (không xem trước ai cũng không thấy trừ bạn) và nhận 1 vàng nếu còn.</p>
     <div class="mdb"><button class="sec" data-a="closem">Hủy</button><button data-a="doreserve" data-l="${modal.level}" data-i="-1">Giữ thẻ</button></div></div></div>`;
@@ -468,6 +479,85 @@ function renderModal() {
   return '';
 }
 
+
+// ---------- màn hình kết quả ----------
+function finalHtml() {
+  const g = S.game, L = S.lobby, host = L.hostId === L.me, anim = !modal.shown;
+  const rows = [...g.players].sort((a, b) => b.points - a.points || a.cards.length - b.cards.length);
+  const won = g.winners.includes(L.me), tie = g.winners.length > 1;
+  const wn = g.players.filter((p) => g.winners.includes(p.id)).map((p) => esc(p.name)).join(' & ');
+  const maxP = Math.max(1, ...rows.map((p) => p.points));
+  const col = (p) => PCOL[g.players.indexOf(p) % 4];
+  const title = won ? (tie ? '🤝 Hoà — cùng chiến thắng!' : '🏆 Chiến thắng!') : 'Ván đã kết thúc';
+  const sub = won ? 'Một vụ giao thương rực rỡ!' : `${wn} giành chiến thắng. Lần sau sẽ khác!`;
+  const pod = rows.map((p, i) => {
+    const w = g.winners.includes(p.id);
+    return `<div class="pod ${w ? 'win' : ''} ${anim ? 'play' : ''}" style="--h:${46 + (p.points / maxP) * 120}px;--pc:${col(p)};--d:${(rows.length - 1 - i) * 0.25}s">
+      <div class="pn">${w ? '<span class="crown">👑</span>' : ''}<span class="av">${esc(Array.from((p.name || '?').trim())[0].toUpperCase())}</span><b>${esc(p.name)}</b></div>
+      <div class="bar"><span class="cnt" data-to="${p.points}">${anim ? 0 : p.points}</span><small>${p.cards.length} thẻ · ${p.nobles.length} quý tộc</small></div></div>`;
+  }).join('');
+  // biểu đồ điểm theo vòng
+  let chart = '';
+  const ser = g.series || [];
+  if (ser.length >= 2) {
+    const W = 340, H = 120, px = 26, py = 10, n = ser.length, my = Math.max(15, maxP);
+    const X = (i) => px + (i / n) * (W - px - 8), Y = (v) => H - py - (v / my) * (H - 2 * py);
+    const lines = g.players.map((p, k) => {
+      const pts = [[X(0), Y(0)], ...ser.map((r, i) => [X(i + 1), Y(r[k])])];
+      const len = Math.round(pts.reduce((a, c, i) => (i ? a + Math.hypot(c[0] - pts[i - 1][0], c[1] - pts[i - 1][1]) : 0), 0)) + 4;
+      const last = pts[pts.length - 1];
+      return `<polyline points="${pts.map((c) => c.map((v) => v.toFixed(1)).join(',')).join(' ')}" fill="none" stroke="${PCOL[k % 4]}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round" ${anim ? `class="draw" style="--len:${len}"` : ''}/>
+        <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.4" fill="${PCOL[k % 4]}"/>`;
+    }).join('');
+    const y15 = Y(15);
+    chart = `<div class="lbl" style="margin-top:12px">Điểm theo từng vòng</div>
+      <svg class="chart" viewBox="0 0 ${W} ${H}"><line x1="${px}" y1="${y15}" x2="${W - 8}" y2="${y15}" stroke="#e8b92388" stroke-dasharray="4 4"/><text x="2" y="${y15 + 3}" font-size="9" fill="#e8b923">15</text>
+      <line x1="${px}" y1="${H - py}" x2="${W - 8}" y2="${H - py}" stroke="#ffffff22"/>${lines}</svg>
+      <div class="legend">${g.players.map((p, k) => `<span><i style="background:${PCOL[k % 4]}"></i>${esc(p.name)}</span>`).join('')}</div>`;
+  }
+  // danh hiệu
+  const st = (p, k) => (p.st && p.st[k]) || 0;
+  const AW = [['📚', 'Nhà sưu tập', 'thẻ', (p) => p.cards.length], ['👑', 'Quý tộc sủng ái', 'quý tộc', (p) => p.nobles.length],
+    ['💰', 'Tay buôn đá', 'viên đã lấy', (p) => st(p, 'take')], ['🃏', 'Người giữ bài', 'thẻ đã giữ', (p) => st(p, 'reserve')],
+    ['🏰', 'Chủ thành cấp 3', 'thẻ cấp 3', (p) => p.cards.filter((id) => CARDS[id].level === 3).length]];
+  const awards = AW.map(([ic, nm, unit, f]) => {
+    const mx = Math.max(...g.players.map(f)); if (mx <= 0) return '';
+    const who = g.players.filter((p) => f(p) === mx); if (who.length === g.players.length) return '';
+    return `<div class="aw"><span class="ic">${ic}</span><div><b>${nm}</b><small>${who.map((p) => esc(p.name)).join(' & ')} · ${mx} ${unit}</small></div></div>`;
+  }).filter(Boolean).slice(0, 4).join('');
+  return `<div class="ov final ${won ? 'won' : 'lost'}"><div class="rays"></div><div class="md fin ${anim ? 'play' : ''}" data-stop>
+    <h2 class="ftitle">${title}</h2><div class="sub">${sub}</div>
+    <div class="podium">${pod}</div>${chart}
+    ${awards ? `<div class="awards">${awards}</div>` : ''}${scoreHtml()}
+    <div class="mdb"><button class="sec" data-a="closeover">Xem bàn</button>${host ? '<button data-a="rematch">Ván mới</button><button class="sec" data-a="tolobby">Về sảnh</button>' : '<div class="sub" style="flex:1;margin:0">Đợi chủ phòng bắt đầu ván mới…</div>'}</div></div></div>`;
+}
+function countUp() {
+  document.querySelectorAll('.cnt[data-to]').forEach((el) => {
+    const to = +el.dataset.to, t0 = performance.now(), dur = 1400 + to * 25;
+    const tick = (t) => { const k = Math.min(1, (t - t0) / dur); el.textContent = Math.round(to * (1 - Math.pow(1 - k, 3))); if (k < 1 && document.body.contains(el)) requestAnimationFrame(tick); else el.textContent = to; };
+    requestAnimationFrame(tick);
+  });
+}
+
+// ---------- cài đặt giao diện ----------
+function settingsHtml() {
+  const st = FX.state(), tr = FX.tracks();
+  return `<div class="ov" data-a="closem"><div class="md wide set" data-stop>
+    <h3>Tuỳ chỉnh</h3>
+    <div class="lbl">Bàn chơi</div>
+    <div class="swatches">${TABLES.map((t) => `<button class="sw ${prefs.table === t.id ? 'on' : ''}" data-a="pref" data-k="table" data-v="${t.id}" style="--s1:${t.c1};--s2:${t.c2}"><i></i>${t.name}</button>`).join('')}</div>
+    <div class="lbl">Bộ bài (mặt sau thẻ)</div>
+    <div class="swatches">${DECKS.map((d) => `<button class="sw deck ${prefs.deck === d.id ? 'on' : ''}" data-a="pref" data-k="deck" data-v="${d.id}" ><span class="mb l1 card back" style="--k1:${d.k[0][0]};--k2:${d.k[0][1]}"></span><span class="mb l2 card back" style="--k1:${d.k[1][0]};--k2:${d.k[1][1]}"></span><span class="mb l3 card back" style="--k1:${d.k[2][0]};--k2:${d.k[2][1]}"></span>${d.name}</button>`).join('')}</div>
+    <div class="lbl">Tranh trên thẻ</div>
+    <div class="swatches"><button class="sw txt ${prefs.art === 'photo' ? 'on' : ''}" data-a="pref" data-k="art" data-v="photo">Ảnh gốc</button><button class="sw txt ${prefs.art === 'svg' ? 'on' : ''}" data-a="pref" data-k="art" data-v="svg">Tranh vẽ</button></div>
+    <div class="lbl">Nhạc nền</div>
+    <div class="tracks">${tr.map((t) => `<button class="tk ${st.track === t.id && st.music ? 'on' : ''}" data-a="track" data-id="${t.id}"><b>${st.track === t.id && st.music ? '♪ ' : ''}${t.name}</b><small>${t.desc}</small></button>`).join('')}
+      <button class="tk ${st.music ? '' : 'on'}" data-a="music"><b>${st.music ? 'Tắt nhạc nền' : '✓ Đang tắt nhạc'}</b></button></div>
+    <div class="vol"><span class="lbl">Âm lượng nhạc</span><input type="range" id="musvol" min="0" max="100" value="${Math.round(st.mvol * 100)}"></div>
+    <div class="vol"><span class="lbl">Âm lượng hiệu ứng</span><input type="range" id="sfxvol" min="0" max="100" value="${Math.round(st.svol * 100)}"></div>
+    <div class="mdb"><button data-a="closem">Xong</button></div></div></div>`;
+}
+
 function renderDiscard() {
   const g = S.game;
   if (!(myTurn() && g.phase === 'discard')) return '';
@@ -481,7 +571,7 @@ function renderDiscard() {
 
 function sndHtml() {
   const st = FX.state();
-  return `<div class="snd"><button class="${st.music ? '' : 'off'}" data-a="music" title="Nhạc nền">🎵</button><button class="${st.sfx ? '' : 'off'}" data-a="sfx" title="Hiệu ứng âm thanh">🔔</button>${'Notification' in window ? `<button class="${notifyOn ? '' : 'off'}" data-a="notif" title="Thông báo khi đến lượt (lúc ở tab khác)">📣</button>` : ''}</div>`;
+  return `<div class="snd"><button data-a="settings" title="Giao diện, bộ bài, nhạc">⚙️</button><button class="${st.music ? '' : 'off'}" data-a="music" title="Nhạc nền">🎵</button><button class="${st.sfx ? '' : 'off'}" data-a="sfx" title="Hiệu ứng âm thanh">🔔</button>${'Notification' in window ? `<button class="${notifyOn ? '' : 'off'}" data-a="notif" title="Thông báo khi đến lượt (lúc ở tab khác)">📣</button>` : ''}</div>`;
 }
 function render() {
   const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, v: ae.value, s: ae.selectionStart } : null;
@@ -491,8 +581,10 @@ function render() {
   if (!sess || !S) h = renderEntry();
   else if (!S.game) h = renderLobby();
   else h = renderGame() + renderModal() + renderDiscard();
+  if (!(sess && S && S.game) && modal && modal.kind === 'settings') h += settingsHtml();
   $app.innerHTML = sndHtml() + h + (toastMsg ? `<div class="toast">${esc(toastMsg)}</div>` : '');
   if (keep) { const e = document.getElementById(keep.id); if (e) { e.value = keep.v; e.focus(); try { e.setSelectionRange(keep.s, keep.s); } catch (x) {} } }
+  if (modal && modal.kind === 'over' && !modal.shown) { modal.shown = true; countUp(); }
   for (const id of [...IDS, 'hist']) { const e = document.getElementById(id); if (e && (id === 'hist' || stick[id])) e.scrollTop = e.scrollHeight; }
 }
 
@@ -516,6 +608,10 @@ $app.addEventListener('click', async (e) => {
       }
       case 'copy': navigator.clipboard && navigator.clipboard.writeText(`${location.origin}/?room=${S.lobby.code}`); showToast('Đã chép link', true); break;
       case 'start': await post('start'); break;
+      case 'settings': modal = { kind: 'settings' }; render(); break;
+      case 'pref': prefs[t.dataset.k] = t.dataset.v; localStorage.setItem('splendor_prefs', JSON.stringify(prefs)); applyPrefs(); render(); break;
+      case 'track': FX.setTrack(t.dataset.id); render(); break;
+      case 'showover': modal = { kind: 'over' }; render(); break;
       case 'addbot': await post('addbot', { style: t.dataset.s }); break;
       case 'rmbot': await post('rmbot', { id: t.dataset.id }); break;
       case 'rematch': modal = null; await post('rematch'); break;
@@ -563,6 +659,10 @@ $app.addEventListener('click', async (e) => {
 
 $app.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && e.target.id === 'chatin') { e.preventDefault(); const b = $app.querySelector('[data-a="chatsend"]'); b && b.click(); }
+});
+$app.addEventListener('input', (e) => {
+  if (e.target.id === 'musvol') FX.setVolume('music', e.target.value / 100);
+  if (e.target.id === 'sfxvol') FX.setVolume('sfx', e.target.value / 100);
 });
 $app.addEventListener('change', async (e) => {
   if (e.target.id === 'timer') { try { await post('settings', { timer: +e.target.value }); } catch (x) { showToast(x.message); } }
