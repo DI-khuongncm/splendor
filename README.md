@@ -10,6 +10,7 @@ Chạy: bấm đúp `start.bat` (hoặc `node server.js`). Không cần cài th�
 ## Tính năng
 - 2–4 người, có thể thêm **máy** (Thương gia / Quý tộc / Tham lam, và **Cao thủ** – mạnh nhất) để đủ người.
   Cao thủ (`mcts.js`) giả lập hàng trăm ván mỗi nước (Monte Carlo, xáo lại bài ẩn nên không nhìn trộm), chạy trong worker riêng (`bot-worker.js`) để không chặn server. Thời gian nghĩ mỗi nước: biến môi trường `BOT_THINK_MS` (mặc định 1500).
+  Máy thường biết chặn thẻ đối thủ sắp mua; hệ số trong `bot.js` (W) được tối ưu bằng tự đấu: `node tools/tune-bot.js [số vòng]`.
 - **Nhạc nền + âm thanh** kiểu Phục Hưng (tự tổng hợp, không cần file), hoạt ảnh thẻ/đá bay, pháo giấy khi thắng. Nút 🎵 🔔 góc dưới phải.
 - **Đồng hồ lượt** (chủ phòng chọn 45–180 giây; hết giờ máy đi thay), nút **⏰ Nhắc** người đang suy nghĩ lâu.
 - **Chat + emoji**, **lịch sử nước đi**, **bảng thành tích nhóm**, **Ván mới** ngay cùng nhóm.

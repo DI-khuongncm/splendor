@@ -39,8 +39,8 @@ function determinize(g, meId) {
 }
 
 // Các nước đi ở gốc: lấy từ máy thường (đã có điểm sơ bộ) + giữ thẻ úp từ chồng, rồi cắt bớt.
-function rootMoves(g, p, k) {
-  const cs = B.candidates(g, p, B.STYLES.balanced);
+function rootMoves(g, p, k, w) {
+  const cs = B.candidates(g, p, B.STYLES.balanced, w);
   if (p.reserved.length < E.MAX_RESERVED) for (const l of [1, 2, 3]) if (g.decks[l].length) cs.push({ s: -0.5, a: { type: 'reserve', level: l, index: -1 } });
   cs.sort((x, y) => y.s - x.s);
   const out = [], seen = new Set();
@@ -72,12 +72,12 @@ function evaluate(g, meId) {
   return 1 / (1 + Math.exp(-(me - best) / 2.5));
 }
 
-function rollout(s, meId, maxTurns) {
-  const styleOf = {}; s.players.forEach((p, i) => { styleOf[p.id] = ROLL_STYLES[i % ROLL_STYLES.length]; });
+function rollout(s, meId, maxTurns, o) {
+  const rs = o.rollStyles || ROLL_STYLES, styleOf = {}; s.players.forEach((p, i) => { styleOf[p.id] = rs[i % rs.length]; });
   let steps = 0;
   while (s.phase !== 'over' && steps++ < maxTurns * 3) {
     const p = s.players[s.turn];
-    try { B.play(s, p.id, styleOf[p.id]); } catch (e) { break; }
+    try { B.play(s, p.id, styleOf[p.id], o.w); } catch (e) { break; }
     if (s.phase === 'main' && steps >= maxTurns && !s.finalRound) break;
   }
   return evaluate(s, meId);
@@ -86,7 +86,7 @@ function rollout(s, meId, maxTurns) {
 function think(g, meId, ms = 1500, opts = {}) {
   const p = g.players[g.turn];
   if (p.id !== meId || g.phase !== 'main') return B.choose(g, meId, 'balanced');
-  const moves = rootMoves(g, p, opts.width || 10);
+  const moves = rootMoves(g, p, opts.width || 10, opts.w);
   if (moves.length <= 1) return moves[0] || { type: 'pass' };
   // Gần hết ván thì giả lập đến cuối; còn sớm thì nhìn trước ~2 vòng.
   const lead = Math.max(...g.players.map(E.points));
@@ -102,7 +102,7 @@ function think(g, meId, ms = 1500, opts = {}) {
     }
     const s = determinize(g, meId);
     let r;
-    try { E.apply(s, meId, moves[bi]); r = rollout(s, meId, depth); } catch (e) { r = 0; }
+    try { E.apply(s, meId, moves[bi]); r = rollout(s, meId, depth, opts); } catch (e) { r = 0; }
     n[bi]++; w[bi] += r; sims++;
   }
   let best = 0; for (let i = 1; i < moves.length; i++) if (n[i] > n[best] || (n[i] === n[best] && w[i] > w[best])) best = i;
