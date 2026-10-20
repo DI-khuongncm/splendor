@@ -3,10 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpolygon points=%2712,2 22,9 12,22 2,9%27 fill=%27%23e8b923%27/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="alternate icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 24 24%27%3E%3Cpolygon points=%2712,2 22,9 12,22 2,9%27 fill=%27%23e8b923%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Playfair+Display:wght@600;700;800&family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#14121a">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <title>Splendor - Chơi cùng bạn bè</title>
 <style>
 :root{
@@ -190,9 +195,11 @@ h1{font-family:var(--serif)} /* Cinzel không có dấu tiếng Việt: chỉ d�
 </style>
 </head>
 <body>
+<div id="splash"><div class="sp-in"><svg viewBox="0 0 24 24" width="64" height="64"><polygon points="1,9 7,9 12,22" fill="#c9972a"/><polygon points="17,9 23,9 12,22" fill="#a8730a"/><polygon points="7,9 17,9 12,22" fill="#e8b923"/><polygon points="6,3 18,3 23,9 1,9" fill="#ffe08a"/><polygon points="9,3 15,3 17,9 7,9" fill="#fff1b8"/></svg><h1>SPLENDOR</h1><div class="sp-bar"><i></i></div></div></div>
 <div id="app"></div>
 <link rel="stylesheet" href="fx.css">
 <link rel="stylesheet" href="fx2.css">
+<link rel="stylesheet" href="fx3.css">
 <script src="data.js"></script>
 <script src="fx.js"></script>
 <script src="app.js"></script>

@@ -13,7 +13,8 @@ let modal = null;  // { kind:'card', from, level, index, id } | { kind:'deck', l
 let disc = {};     // đá định bỏ
 let toastMsg = '', toastTimer = 0, lobbyErr = '';
 let lastTurnKey = '', fails = 0;
-let lastSig = '', skew = 0, seenChat = null, seenNudge = null, notifyOn = false;
+let offline = false, lastSig = '', skew = 0, seenChat = null, seenNudge = null, notifyOn = false;
+const vib = (p) => { try { if (navigator.vibrate && navigator.userActivation && navigator.userActivation.hasBeenActive) navigator.vibrate(p); } catch (e) {} };
 const PCOL = ['#e8b923', '#4f8be9', '#e24a44', '#3dbd71'];
 const TABLES = [
   { id: 'felt', name: 'Nỉ xanh', c1: '#22573f', c2: '#123526' }, { id: 'velvet', name: 'Nhung đỏ', c1: '#8a2436', c2: '#4a0f1b' },
@@ -216,6 +217,7 @@ function connect() {
         if (id !== loopId) return;
         if (!r.ok) throw new Error(j.error || 'lỗi');
         fails = 0;
+        if (offline) { offline = false; render(); }
         ver = j.v;
         if (!j.same) {
           const prevG = S && S.game, snap = FX.snapshot();
@@ -225,6 +227,7 @@ function connect() {
       } catch (e) {
         if (id !== loopId) return;
         fails++;
+        if (fails >= 2 && !offline) { offline = true; render(); }
         if (fails > 8) { // phòng không còn / phiên hỏng
           localStorage.removeItem('splendor'); sess = null; S = null; lobbyErr = 'Mất kết nối với phòng.'; render(); return;
         }
@@ -253,7 +256,7 @@ function onState() {
   if (seenNudge === null) seenNudge = nt;
   else if (nt > seenNudge) {
     seenNudge = nt;
-    if (L.nudge.to === L.me) { FX.sfx('nudge'); FX.flash(`${L.nudge.from} đang đợi bạn!`); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
+    if (L.nudge.to === L.me) { FX.sfx('nudge'); FX.flash(`${L.nudge.from} đang đợi bạn!`); vib([200, 100, 200]); }
   }
   const g = S.game;
   if (!g) { if (modal && modal.kind !== 'settings') modal = null; return; }
@@ -261,7 +264,7 @@ function onState() {
   if (key !== lastTurnKey) {
     lastTurnKey = key; sel = []; disc = {};
     if (myTurn() && (document.hidden || !document.hasFocus())) {
-      try { navigator.vibrate && navigator.vibrate(150); } catch (e) {}
+      vib(150);
       if (notifyOn) try { new Notification('Splendor', { body: 'Đến lượt bạn!', tag: 'splendor-turn' }); } catch (e) {}
     }
     if (modal && !['over', 'settings', 'history'].includes(modal.kind)) modal = null;
@@ -294,15 +297,27 @@ function backHtml(level, n, attrs = '') {
   return `<div class="card back l${level}" ${attrs}><div class="bk">
     <span class="bt">SPLENDOR</span>${gemSvg(['', 'green', 'gold', 'blue'][level], 34)}<b>${ROMAN[level]}</b><span class="bn">${n == null ? '' : n + ' thẻ'}</span></div></div>`;
 }
+function nobleProg(n) {
+  if (!(S && S.game && me())) return '';
+  const b = me().bonuses; let have = 0, need = 0;
+  for (const c of COLORS) if (n.req[c]) { need += n.req[c]; have += Math.min(b[c], n.req[c]); }
+  return need ? `<i class="nprog" title="${have}/${need}"><u style="width:${(have / need) * 100}%"></u></i>` : '';
+}
 function nobleHtml(id, pick) {
   const n = NOBLES[id], pk = `${pick ? 'pick' : ''}" data-nid="${id}" ${pick ? `data-a="noble" data-id="${id}"` : ''}`;
-  if (useImg('n' + id)) return `<div class="noble img ${pk} style="background-image:url(art/n${id}.jpg)"></div>`;
+  if (useImg('n' + id)) return `<div class="noble img ${pk} style="background-image:url(art/n${id}.jpg)">${nobleProg(n)}</div>`;
   return `<div class="noble nart-${id} ${pk}><div class="nside">
     <span class="np">${n.points}</span>
-    <div class="nr">${COLORS.filter((c) => n.req[c]).map((c) => `<div class="cost ${c}">${n.req[c]}</div>`).join('')}</div></div></div>`;
+    <div class="nr">${COLORS.filter((c) => n.req[c]).map((c) => `<div class="cost ${c}">${n.req[c]}</div>`).join('')}</div></div>${nobleProg(n)}</div>`;
 }
 function tokHtml(c, n, extra = '', cls = '', attrs = '') {
-  return `<div class="tok ${c} ${cls}" ${attrs} title="${VI[c]}">${gemSvg(c, cls.includes('mini') ? 17 : 32)}${extra}<span class="n">${n}</span></div>`;
+  let stk = '';
+  if (!cls.includes('mini') && n > 0 && attrs.includes('data-bank')) { // xếp chồng: càng nhiều đá, chồng càng dày
+    const k = Math.min(n, 6), L = [];
+    for (let i = 1; i <= k; i++) L.push(`0 ${i * 3}px 0 ${i % 2 ? 'var(--tc)' : 'var(--te)'}`);
+    stk = `style="--stk:${L.join(',')},0 ${k * 3 + 6}px 12px #000a"`;
+  }
+  return `<div class="tok ${c} ${cls}" ${attrs} ${stk} title="${VI[c]}">${gemSvg(c, cls.includes('mini') ? 17 : 32)}${extra}<span class="n">${n}</span></div>`;
 }
 
 // ---------- màn hình sảnh ----------
@@ -360,7 +375,7 @@ function boardHtml() {
     g.board[l].forEach((id, i) => {
       if (id == null) { h += `<div class="card empty"></div>`; return; }
       const aff = mine && pay(m, CARDS[id]);
-      h += cardHtml(id, `data-a="card" data-from="board" data-l="${l}" data-i="${i}" data-id="${id}"`, aff ? 'afford' : '');
+      h += cardHtml(id, `data-a="card" data-from="board" data-l="${l}" data-i="${i}" data-id="${id}"`, aff ? 'afford' : mine ? 'nope' : '');
     });
     h += `</div>`;
   }
@@ -399,7 +414,7 @@ function playerHtml(p) {
   const mem = S.lobby.members.find((m) => m.id === p.id);
   const pi = g.players.indexOf(p), pcol = ['#e8b923', '#4f8be9', '#e24a44', '#3dbd71'][pi % 4];
   let h = `<div class="pl ${turn ? 'turn' : ''}" data-pid="${p.id}" style="--pc:${pcol}"><div class="hd"><span class="av">${esc(Array.from((p.name || '?').trim())[0].toUpperCase())}</span><span class="dot ${mem && mem.online ? 'on' : ''}"></span>
-    <span class="nm">${esc(p.name)}${isMe ? ' (bạn)' : ''}</span>${turn ? '<span class="tag">LƯỢT</span>' : ''}<span class="pt">${p.points}</span></div>`;
+    <span class="nm">${esc(p.name)}${isMe ? ' (bạn)' : ''}</span>${turn ? '<span class="tag">LƯỢT</span>' : ''}<span class="pt" style="--p:${Math.min(100, (p.points / 15) * 100)}"><b>${p.points}</b></span></div>`;
   h += `<div class="chips">${['white', 'blue', 'green', 'red', 'black', 'gold'].map((c) => p.tokens[c] ? tokHtml(c, p.tokens[c], '', 'mini') : '').join('') || '<span class="lbl">chưa có đá</span>'}</div>`;
   h += `<div class="bon">${COLORS.map((c) => p.bonuses[c] ? `<span class="bonc k-${c}" title="Bonus ${VI[c]}">${gemSvg(c, 15)}<b>${p.bonuses[c]}</b></span>` : '').join('')}<span class="bonc" title="Số thẻ đã mua">🃏 ${p.cards.length}</span>${p.nobles.length ? `<span class="bonc">👑 ${p.nobles.length}</span>` : ''}</div>`;
   if (p.reserved.length) {
@@ -585,8 +600,9 @@ function render() {
   // hoạt ảnh xuất hiện chỉ chạy khi đổi màn hình/hộp thoại; vẽ lại giữa chừng (poll, chọn đá...) thì giữ nguyên, không giật
   const sig = (!sess || !S ? 'e' : !S.game ? 'l' : 'g') + '|' + (modal ? modal.kind : '') + '|' + (toastMsg ? 1 : 0) + '|' + (S && S.game && myTurn() && S.game.phase === 'discard' ? 'd' : '');
   $app.classList.toggle('still', sig === lastSig); lastSig = sig;
-  $app.innerHTML = sndHtml() + h + (toastMsg ? `<div class="toast">${esc(toastMsg)}</div>` : '');
+  $app.innerHTML = (offline ? '<div class="conn">⚠ Mất kết nối — đang thử lại…</div>' : '') + sndHtml() + h + (toastMsg ? `<div class="toast">${esc(toastMsg)}</div>` : '');
   if (keep) { const e = document.getElementById(keep.id); if (e) { e.value = keep.v; e.focus(); try { e.setSelectionRange(keep.s, keep.s); } catch (x) {} } }
+  markFocusable(); hideZoom();
   if (modal && modal.kind === 'over' && !modal.shown) { modal.shown = true; countUp(); }
   for (const id of [...IDS, 'hist']) { const e = document.getElementById(id); if (e && (id === 'hist' || stick[id])) e.scrollTop = e.scrollHeight; }
 }
@@ -680,6 +696,44 @@ setInterval(() => {
   }
   if (S && S.game && myTurn() && document.hidden) document.title = (blink ^= 1) ? '▶ Đến lượt bạn!' : 'Splendor';
 }, 1000);
+
+// ---------- xem trước thẻ khi rê chuột ----------
+let zoomT = 0, zoomEl = null;
+function hideZoom() { clearTimeout(zoomT); if (zoomEl) { zoomEl.remove(); zoomEl = null; } }
+$app.addEventListener('mouseover', (e) => {
+  const c = e.target.closest && e.target.closest('.card[data-cid]');
+  if (!c || c.closest('.md') || !(S && S.game) || matchMedia('(hover: none)').matches) return;
+  if (c === zoomEl) return;
+  clearTimeout(zoomT);
+  zoomT = setTimeout(() => {
+    if (!document.body.contains(c)) return;
+    hideZoom();
+    const id = +c.dataset.cid, card = CARDS[id], m = me(), r = c.getBoundingClientRect();
+    const eff = {}; if (m) for (const k of COLORS) { const v = Math.max(0, (card.cost[k] || 0) - m.bonuses[k]); if (v) eff[k] = v; }
+    const pm = m && pay(m, card);
+    let need = 0; if (m && !pm) { for (const k of COLORS) need += Math.max(0, (eff[k] || 0) - m.tokens[k]); need = Math.max(0, need - m.tokens.gold); }
+    const status = !m ? '' : pm ? '<b class="ok">Bạn đủ đá để mua</b>' : `<b class="no">Còn thiếu ${need} viên</b>`;
+    zoomEl = document.createElement('div'); zoomEl.className = 'zoomtip';
+    zoomEl.innerHTML = `${cardHtml(id, '', 'nocid zbig')}<div class="zi"><div class="lbl">Giá thực (sau bonus)</div><div class="zc">${COLORS.filter((k) => eff[k]).map((k) => `<div class="cost ${k}">${eff[k]}</div>`).join('') || '<b>Miễn phí</b>'}</div>${status}</div>`;
+    document.body.appendChild(zoomEl);
+    const w = zoomEl.offsetWidth, h = zoomEl.offsetHeight;
+    let x = r.right + 12; if (x + w > innerWidth - 8) x = r.left - w - 12;
+    zoomEl.style.left = Math.max(8, x) + 'px'; zoomEl.style.top = Math.max(8, Math.min(innerHeight - h - 8, r.top - 20)) + 'px';
+  }, 450);
+});
+$app.addEventListener('mouseout', (e) => { if (e.target.closest && e.target.closest('.card[data-cid]')) hideZoom(); });
+$app.addEventListener('mousedown', hideZoom);
+
+// bàn phím: thẻ, đá quý, nút bấm trong ván có thể chọn bằng Tab + Enter/Space
+$app.addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.card[data-a], .tok[data-a], .noble[data-a]')) { e.preventDefault(); e.target.click(); }
+});
+function markFocusable() { $app.querySelectorAll('.card[data-a], .tok[data-a], .noble[data-a]').forEach((el) => { el.tabIndex = 0; el.setAttribute('role', 'button'); }); }
+
+// ---------- màn chờ ----------
+function hideSplash() { const sp = document.getElementById('splash'); if (sp) { sp.classList.add('hide'); setTimeout(() => sp.remove(), 700); } }
+window.addEventListener('load', () => setTimeout(hideSplash, 450));
+setTimeout(hideSplash, 3500);
 
 // ---------- khởi động ----------
 probeArt();

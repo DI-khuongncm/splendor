@@ -13,7 +13,7 @@ const store = require('./store');
 const PORT = process.env.PORT || 3000;
 const PUB = path.join(__dirname, 'public');
 const rooms = new Map();
-const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.webmanifest': 'application/manifest+json' };
 const TIMERS = [0, 45, 60, 90, 120, 180];
 const ROOM_TTL = 3 * 86400e3;
 
