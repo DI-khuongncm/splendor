@@ -167,7 +167,8 @@ function pay(p, card) {
   out.gold = gold; return out;
 }
 const total = (t) => Object.values(t).reduce((a, b) => a + b, 0);
-function showToast(m) {
+function showToast(m, quiet) {
+  if (!quiet) FX.sfx('error');
   toastMsg = m; clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { toastMsg = ''; render(); }, 3000); render();
 }
@@ -196,7 +197,11 @@ function connect() {
         if (!r.ok) throw new Error(j.error || 'lỗi');
         fails = 0;
         ver = j.v;
-        if (!j.same) { S = j.data; onState(); render(); }
+        if (!j.same) {
+          const prevG = S && S.game, snap = FX.snapshot();
+          S = j.data; onState(); render();
+          if (S.game) FX.diff(prevG, S.game, snap, S.lobby.me);
+        }
       } catch (e) {
         if (id !== loopId) return;
         fails++;
@@ -233,9 +238,9 @@ function probeArt() {
   NOBLES.forEach((n) => check('n' + n.id, `art/n${n.id}.jpg`));
 }
 function cardHtml(id, attrs = '', cls = '') {
-  const c = CARDS[id];
-  if (!NOIMG.has('c' + id)) return `<div class="card img b-${c.bonus} ${cls}" style="background-image:url(art/c${id}.jpg)" ${attrs}></div>`;
-  return `<div class="card b-${c.bonus} art-${c.level}-${c.bonus}-${id % 2} ${cls}" ${attrs}>
+  const c = CARDS[id], cid = cls.includes('nocid') ? '' : `data-cid="${id}"`;
+  if (!NOIMG.has('c' + id)) return `<div class="card img b-${c.bonus} ${cls}" style="background-image:url(art/c${id}.jpg)" ${cid} ${attrs}></div>`;
+  return `<div class="card b-${c.bonus} art-${c.level}-${c.bonus}-${id % 2} ${cls}" ${cid} ${attrs}>
     <div class="top"><span class="pts">${c.points || ''}</span>${gemSvg(c.bonus, 28)}</div>
     <div class="costs">${costCircles(c)}</div><i class="lvm">${'•'.repeat(c.level)}</i></div>`;
 }
@@ -245,7 +250,7 @@ function backHtml(level, n, attrs = '') {
     <span class="bt">SPLENDOR</span>${gemSvg(['', 'green', 'gold', 'blue'][level], 34)}<b>${ROMAN[level]}</b><span class="bn">${n == null ? '' : n + ' thẻ'}</span></div></div>`;
 }
 function nobleHtml(id, pick) {
-  const n = NOBLES[id], pk = `${pick ? 'pick' : ''}" ${pick ? `data-a="noble" data-id="${id}"` : ''}`;
+  const n = NOBLES[id], pk = `${pick ? 'pick' : ''}" data-nid="${id}" ${pick ? `data-a="noble" data-id="${id}"` : ''}`;
   if (!NOIMG.has('n' + id)) return `<div class="noble img ${pk} style="background-image:url(art/n${id}.jpg)"></div>`;
   return `<div class="noble nart-${id} ${pk}><div class="nside">
     <span class="np">${n.points}</span>
@@ -260,6 +265,7 @@ function renderEntry() {
   const q = new URLSearchParams(location.search).get('room') || '';
   const name = localStorage.getItem('splendor_name') || '';
   return `<div class="center"><div class="box">
+    <div class="gemrow">${[...COLORS, 'gold'].map((c) => gemSvg(c, 30)).join('')}</div>
     <h1>SPLENDOR</h1><div class="sub">Bản chơi riêng cùng bạn bè · 2–4 người</div>
     <input id="name" placeholder="Tên của bạn" maxlength="16" value="${esc(name)}">
     <div class="row"><button style="flex:1" data-a="create">Tạo phòng mới</button></div>
@@ -300,7 +306,7 @@ function boardHtml() {
   const g = S.game, m = me(), mine = myTurn() && g.phase === 'main';
   let h = `<div class="nobles">${g.nobles.map((id) => nobleHtml(id, g.eligible.includes(id))).join('')}</div>`;
   for (const l of [3, 2, 1]) {
-    h += `<div class="lvrow">` + (g.deckCounts[l] ? backHtml(l, g.deckCounts[l], mine && m.reserved.length < 3 ? `data-a="deck" data-l="${l}"` : '') : `<div class="card empty"></div>`);
+    h += `<div class="lvrow">` + (g.deckCounts[l] ? backHtml(l, g.deckCounts[l], `data-deck="${l}" ` + (mine && m.reserved.length < 3 ? `data-a="deck" data-l="${l}"` : '')) : `<div class="card empty"></div>`);
     g.board[l].forEach((id, i) => {
       if (id == null) { h += `<div class="card empty"></div>`; return; }
       const aff = mine && pay(m, CARDS[id]);
@@ -316,7 +322,7 @@ function bankHtml() {
   let h = '';
   for (const c of [...COLORS, 'gold']) {
     const n = g.bank[c], k = sel.filter((x) => x === c).length;
-    h += tokHtml(c, n, k ? `<span class="sc">${k}</span>` : '', `${k ? 'sel' : ''} ${n ? '' : 'zero'}`, c !== 'gold' && mine ? `data-a="tok" data-c="${c}"` : '');
+    h += tokHtml(c, n, k ? `<span class="sc">${k}</span>` : '', `${k ? 'sel' : ''} ${n ? '' : 'zero'}`, `data-bank="${c}" ` + (c !== 'gold' && mine ? `data-a="tok" data-c="${c}"` : ''));
   }
   return h;
 }
@@ -341,7 +347,8 @@ function actsHtml() {
 function playerHtml(p) {
   const g = S.game, isMe = p.id === S.lobby.me, turn = cur().id === p.id && g.phase !== 'over';
   const mem = S.lobby.members.find((m) => m.id === p.id);
-  let h = `<div class="pl ${turn ? 'turn' : ''}"><div class="hd"><span class="dot ${mem && mem.online ? 'on' : ''}"></span>
+  const pi = g.players.indexOf(p), pcol = ['#e8b923', '#4f8be9', '#e24a44', '#3dbd71'][pi % 4];
+  let h = `<div class="pl ${turn ? 'turn' : ''}" data-pid="${p.id}" style="--pc:${pcol}"><div class="hd"><span class="av">${esc((p.name || '?').trim().charAt(0).toUpperCase())}</span><span class="dot ${mem && mem.online ? 'on' : ''}"></span>
     <span class="nm">${esc(p.name)}${isMe ? ' (bạn)' : ''}</span>${turn ? '<span class="tag">LƯỢT</span>' : ''}<span class="pt">${p.points}</span></div>`;
   h += `<div class="chips">${['white', 'blue', 'green', 'red', 'black', 'gold'].map((c) => p.tokens[c] ? tokHtml(c, p.tokens[c], '', 'mini') : '').join('') || '<span class="lbl">chưa có đá</span>'}</div>`;
   h += `<div class="bon">${COLORS.map((c) => p.bonuses[c] ? `<span class="bonc k-${c}" title="Bonus ${VI[c]}">${gemSvg(c, 15)}<b>${p.bonuses[c]}</b></span>` : '').join('')}<span class="bonc" title="Số thẻ đã mua">🃏 ${p.cards.length}</span>${p.nobles.length ? `<span class="bonc">👑 ${p.nobles.length}</span>` : ''}</div>`;
@@ -398,7 +405,7 @@ function renderModal() {
     const canRes = mine && modal.from === 'board' && m.reserved.length < 3;
     const payHtml = pm ? COLORS.concat('gold').filter((c) => pm[c]).map((c) => tokHtml(c, pm[c], '', 'mini')).join('') || '<b>Miễn phí!</b>' : '<span style="color:var(--bad)">Không đủ đá quý</span>';
     return `<div class="ov" data-a="closem"><div class="md" data-stop>
-      ${cardHtml(modal.id)}
+      ${cardHtml(modal.id, '', 'nocid')}
       <div class="lbl" style="text-align:center;margin-top:10px">Bạn sẽ trả</div><div class="pay">${payHtml}</div>
       <div class="mdb"><button class="sec" data-a="closem">Đóng</button>
         ${canRes ? `<button class="sec" data-a="doreserve" data-l="${modal.level}" data-i="${modal.index}">Giữ</button>` : ''}
@@ -418,6 +425,10 @@ function renderDiscard() {
     <div class="mdb"><button data-a="dodisc" ${got === need ? '' : 'disabled'}>Xác nhận</button></div></div></div>`;
 }
 
+function sndHtml() {
+  const st = FX.state();
+  return `<div class="snd"><button class="${st.music ? '' : 'off'}" data-a="music" title="Nhạc nền">🎵</button><button class="${st.sfx ? '' : 'off'}" data-a="sfx" title="Hiệu ứng âm thanh">🔔</button></div>`;
+}
 function render() {
   const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, v: ae.value, s: ae.selectionStart } : null;
   const logTop = document.getElementById('log');
@@ -426,7 +437,7 @@ function render() {
   if (!sess || !S) h = renderEntry();
   else if (!S.game) h = renderLobby();
   else h = renderGame() + renderModal() + renderDiscard();
-  $app.innerHTML = h + (toastMsg ? `<div class="toast">${esc(toastMsg)}</div>` : '');
+  $app.innerHTML = sndHtml() + h + (toastMsg ? `<div class="toast">${esc(toastMsg)}</div>` : '');
   if (keep) { const e = document.getElementById(keep.id); if (e) { e.value = keep.v; e.focus(); try { e.setSelectionRange(keep.s, keep.s); } catch (x) {} } }
   const lg = document.getElementById('log'); if (lg && stick) lg.scrollTop = lg.scrollHeight;
 }
@@ -449,16 +460,19 @@ $app.addEventListener('click', async (e) => {
         history.replaceState(null, '', '/');
         break;
       }
-      case 'copy': navigator.clipboard && navigator.clipboard.writeText(`${location.origin}/?room=${S.lobby.code}`); showToast('Đã chép link'); break;
+      case 'copy': navigator.clipboard && navigator.clipboard.writeText(`${location.origin}/?room=${S.lobby.code}`); showToast('Đã chép link', true); break;
       case 'start': await post('start'); break;
       case 'leave': try { await post('leave'); } catch (x) {} localStorage.removeItem('splendor'); loopId++; sess = null; S = null; render(); break;
       case 'tolobby': await post('lobby'); modal = null; break;
+      case 'music': FX.setMusic(!FX.state().music); render(); break;
+      case 'sfx': FX.setSfx(!FX.state().sfx); FX.sfx('click'); render(); break;
       case 'help': modal = { kind: 'help' }; render(); break;
       case 'closem': modal = null; render(); break;
       case 'closeover': modal = { kind: 'closed', dismissed: true }; render(); break;
       case 'tok': {
         const c = t.dataset.c, k = sel.filter((x) => x === c).length;
         if (!k && g.bank[c] < 1) { showToast('Hết viên ' + VI[c]); break; }
+        FX.sfx('tok');
         if (k === 1 && sel.length === 1 && g.bank[c] >= 4) sel = [c, c];
         else if (k) sel = sel.filter((x) => x !== c);
         else if (sel.length === 2 && sel[0] === sel[1]) sel = [c];
@@ -468,8 +482,8 @@ $app.addEventListener('click', async (e) => {
       case 'clear': sel = []; render(); break;
       case 'take': await act({ type: 'take', colors: sel }); break;
       case 'pass': await act({ type: 'pass' }); break;
-      case 'card': modal = { kind: 'card', from: t.dataset.from, level: +t.dataset.l, index: +t.dataset.i, id: +t.dataset.id }; render(); break;
-      case 'deck': modal = { kind: 'deck', level: +t.dataset.l }; render(); break;
+      case 'card': FX.sfx('open'); modal = { kind: 'card', from: t.dataset.from, level: +t.dataset.l, index: +t.dataset.i, id: +t.dataset.id }; render(); break;
+      case 'deck': FX.sfx('open'); modal = { kind: 'deck', level: +t.dataset.l }; render(); break;
       case 'doreserve': await act({ type: 'reserve', level: +t.dataset.l, index: +t.dataset.i }); break;
       case 'dobuy': await act(modal.from === 'reserved' ? { type: 'buy', from: 'reserved', id: modal.id } : { type: 'buy', from: 'board', level: modal.level, index: modal.index }); break;
       case 'noble': await act({ type: 'noble', id: +t.dataset.id }); break;
