@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const os = require('os');
+const { Worker } = require('worker_threads');
 const engine = require('./engine');
 const bot = require('./bot');
 const store = require('./store');
@@ -102,11 +103,50 @@ function autoMove(room, key) {
   room.deadline = 0; commit(room);
 }
 
+// Máy "Cao thủ" nghĩ trong 1 worker dùng chung (CPU Render free yếu: chạy lần lượt, chia thời gian khi nhiều phòng cùng chờ).
+const THINK_MS = +process.env.BOT_THINK_MS || 1500;
+let brain = null, brainSeq = 0, brainQueue = 0;
+const brainJobs = new Map();
+function getBrain() {
+  if (brain) return brain;
+  brain = new Worker(path.join(__dirname, 'bot-worker.js'));
+  brain.on('message', ({ id, action, error }) => { const j = brainJobs.get(id); if (j) { brainJobs.delete(id); j(error ? null : action); } });
+  const reset = (e) => { if (e) console.error('bot-worker', e.message || e); brain = null; for (const j of brainJobs.values()) j(null); brainJobs.clear(); brainQueue = 0; };
+  brain.on('error', reset); brain.on('exit', (c) => c && reset('exit ' + c));
+  brain.unref();
+  return brain;
+}
+function askBrain(game, me) {
+  const ms = Math.max(300, THINK_MS / (1 + brainQueue));
+  return new Promise((resolve) => {
+    const id = ++brainSeq; brainQueue++;
+    const t = setTimeout(() => done(null), ms * (brainQueue + 1) + 5000);
+    let settled = false;
+    const done = (a) => { if (settled) return; settled = true; clearTimeout(t); brainJobs.delete(id); brainQueue = Math.max(0, brainQueue - 1); resolve(a); };
+    brainJobs.set(id, done);
+    try { getBrain().postMessage({ id, game, me, ms }); } catch (e) { done(null); }
+  });
+}
+function thinkBot(room) {
+  const g = room.game, c = g.players[g.turn], key = `${g.turn}:${g.phase}:${g.round}`, t0 = Date.now();
+  room._bt = true;
+  askBrain(g, c.id).then((a) => {
+    setTimeout(() => {
+      room._bt = null;
+      if (room.game !== g || g.phase === 'over' || key !== `${g.turn}:${g.phase}:${g.round}`) return scheduleBot(room); // ván đã đổi trong lúc nghĩ
+      try { if (!a) throw new Error('no move'); engine.apply(g, c.id, a); }
+      catch (e) { try { bot.play(g, c.id, 'balanced'); } catch (e2) { console.error('bot', e2.message); return; } }
+      commit(room);
+    }, Math.max(0, 900 - (Date.now() - t0)));
+  });
+}
+
 function scheduleBot(room) {
   if (room._bt) return;
   const g = room.game; if (!g || g.phase === 'over') return;
   const cur = g.players[g.turn], mem = memberOf(room, cur.id);
   if (!mem || !mem.bot) return;
+  if (g.phase === 'main' && bot.STYLES[mem.style] && bot.STYLES[mem.style].mcts) return thinkBot(room);
   room._bt = setTimeout(() => {
     room._bt = null;
     const g2 = room.game; if (!g2 || g2.phase === 'over') return;

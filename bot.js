@@ -7,6 +7,7 @@ const STYLES = {
   balanced: { name: 'Thương gia', pts: 1, noble: 0.7, jitter: 0.25 },
   noble: { name: 'Quý tộc', pts: 0.8, noble: 1.8, jitter: 0.25 },
   rush: { name: 'Tham lam', pts: 1.6, noble: 0.3, jitter: 0.25 },
+  master: { name: 'Cao thủ', pts: 1, noble: 0.7, jitter: 0.25, mcts: true }, // nghĩ bằng mcts.js (worker), đây chỉ là dự phòng
 };
 const styleOf = (k) => STYLES[k] || STYLES.balanced;
 
@@ -108,4 +109,4 @@ function play(g, playerId, styleKey) {
   throw err || new Error('Máy không có nước đi');
 }
 
-module.exports = { choose, play, STYLES };
+module.exports = { choose, play, candidates, STYLES };
