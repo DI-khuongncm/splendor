@@ -4,11 +4,11 @@
 const E = require('./engine');
 const { CARDS, NOBLES, COLORS, MAX_TOKENS, MAX_RESERVED, WIN_POINTS } = E;
 
-// Hệ số đã tối ưu bằng tự đấu (2 đợt (1+1)-ES, khoảng nửa triệu ván máy-máy).
+// Hệ số đã tối ưu bằng tự đấu (3 đợt (1+1)-ES, khoảng 700 nghìn ván máy-máy).
 const W = {
   ptsMul: 2.099, base: 1.478, wantCap: 3.621, wantDiv: 6, nobleStep: 1.2, winBonus: 40, // giá trị 1 thẻ
-  buyMul: 1.426, buyBase: 3, goldPen: 0.8, zeroPen: 0.5, // mua
-  takeBase: 0.3, overPen: 1.4, take2Mul: 1.5, take2Base: 0.1, // lấy đá
+  buyMul: 1.426, buyBase: 3, goldPen: 0.925, zeroPen: 0.5, // mua
+  takeBase: 0.3, overPen: 1.4, take2Mul: 1.219, take2Base: 0.1, // lấy đá
   resGold: 1.468, resMul: 0.35, resBase: -0.6, resOverPen: 1.202, // giữ thẻ
   block: 0.6, blockNear: 0.4, blockWin: 8, blockBuy: 0.5, blockMulti: 0.6, // chặn đối thủ
 };
