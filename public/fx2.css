@@ -68,3 +68,13 @@ body[data-table="marble"] .table{background-image:linear-gradient(115deg,transpa
 .md.fin.play .aw{animation:slidein .5s both}
 .md.fin.play .aw:nth-child(1){animation-delay:1.4s}.md.fin.play .aw:nth-child(2){animation-delay:1.6s}.md.fin.play .aw:nth-child(3){animation-delay:1.8s}.md.fin.play .aw:nth-child(4){animation-delay:2s}
 @media(max-width:520px){.awards{grid-template-columns:1fr}.vol .lbl{width:100px}}
+
+/* nút hành động không làm cột đá quý đổi bề rộng (tránh xô lệch khi chọn đá) */
+.acts{width:0;min-width:100%;align-items:center}
+.acts button{white-space:nowrap;width:max-content;max-width:none;padding-left:.6em;padding-right:.6em}
+@media(max-width:1000px){.acts{width:auto;min-width:0}}
+@media(max-width:1000px){.acts{flex-basis:100%;justify-content:center}}
+
+/* vẽ lại giữa chừng thì không chạy lại hoạt ảnh xuất hiện */
+.still .box,.still .ov,.still .md,.still .member,.still .cm,.still .banner:not(.me),.still .log div,.still .toast,.still .tok.sel,.still .md.fin .ftitle,.still .md.fin .aw{animation:none!important}
+.still .pod .bar,.still .pod .pn,.still .pod .crown,.still .draw{animation:none!important;stroke-dashoffset:0}

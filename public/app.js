@@ -13,7 +13,7 @@ let modal = null;  // { kind:'card', from, level, index, id } | { kind:'deck', l
 let disc = {};     // đá định bỏ
 let toastMsg = '', toastTimer = 0, lobbyErr = '';
 let lastTurnKey = '', fails = 0;
-let skew = 0, seenChat = null, seenNudge = null, notifyOn = false;
+let lastSig = '', skew = 0, seenChat = null, seenNudge = null, notifyOn = false;
 const PCOL = ['#e8b923', '#4f8be9', '#e24a44', '#3dbd71'];
 const TABLES = [
   { id: 'felt', name: 'Nỉ xanh', c1: '#22573f', c2: '#123526' }, { id: 'velvet', name: 'Nhung đỏ', c1: '#8a2436', c2: '#4a0f1b' },
@@ -389,7 +389,7 @@ function actsHtml() {
   const g = S.game, mine = myTurn() && g.phase === 'main';
   if (!mine) return '';
   return `<div class="acts">
-    <button data-a="take" ${selValid() ? '' : 'disabled'}>Lấy ${sel.length ? sel.map((c) => VI[c]).join(' + ') : 'đá'}</button>
+    <button data-a="take" ${selValid() ? '' : 'disabled'} title="${sel.map((c) => VI[c]).join(' + ')}">Lấy ${sel.length ? sel.length + ' viên' : 'đá'}</button>
     ${sel.length ? '<button class="sec" data-a="clear">Bỏ chọn</button>' : ''}
     ${g.canPass ? '<button class="bad" data-a="pass">Bỏ lượt</button>' : ''}</div>`;
 }
@@ -582,6 +582,9 @@ function render() {
   else if (!S.game) h = renderLobby();
   else h = renderGame() + renderModal() + renderDiscard();
   if (!(sess && S && S.game) && modal && modal.kind === 'settings') h += settingsHtml();
+  // hoạt ảnh xuất hiện chỉ chạy khi đổi màn hình/hộp thoại; vẽ lại giữa chừng (poll, chọn đá...) thì giữ nguyên, không giật
+  const sig = (!sess || !S ? 'e' : !S.game ? 'l' : 'g') + '|' + (modal ? modal.kind : '') + '|' + (toastMsg ? 1 : 0) + '|' + (S && S.game && myTurn() && S.game.phase === 'discard' ? 'd' : '');
+  $app.classList.toggle('still', sig === lastSig); lastSig = sig;
   $app.innerHTML = sndHtml() + h + (toastMsg ? `<div class="toast">${esc(toastMsg)}</div>` : '');
   if (keep) { const e = document.getElementById(keep.id); if (e) { e.value = keep.v; e.focus(); try { e.setSelectionRange(keep.s, keep.s); } catch (x) {} } }
   if (modal && modal.kind === 'over' && !modal.shown) { modal.shown = true; countUp(); }
