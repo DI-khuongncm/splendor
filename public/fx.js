@@ -131,7 +131,11 @@ const FX = (function () {
     if (!started) { started = true; if (musicOn) startMusic(); }
   }
   ['pointerdown', 'keydown', 'touchstart'].forEach((ev) => window.addEventListener(ev, unlock, { passive: true }));
-  document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend(); else ctx.resume(); });
+  document.addEventListener('visibilitychange', () => { // tab ẩn: tắt nhạc nền nhưng vẫn phát chuông báo lượt
+    if (!ctx) return;
+    if (document.hidden) { stopMusicTimer(); musicBus.gain.setTargetAtTime(0, ctx.currentTime, 0.1); }
+    else { ctx.resume(); if (musicOn) { musicBus.gain.setTargetAtTime(0.5, ctx.currentTime, 0.3); startMusic(); } }
+  });
 
   // --- hiệu ứng âm thanh ---
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -168,6 +172,9 @@ const FX = (function () {
     turn() { const t = ctx.currentTime; ring(t, mtof(81), .1, 1.1, [[1, 1], [2, .3], [3, .1]]); ring(t + .17, mtof(86), .11, 1.4, [[1, 1], [2, .3], [3, .1]]); },
     error() { const t = ctx.currentTime, o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(160, t); o.frequency.exponentialRampToValueAtTime(80, t + .18);
       g.gain.setValueAtTime(.18, t); g.gain.exponentialRampToValueAtTime(.0001, t + .22); o.connect(g); g.connect(sfxBus); o.start(t); o.stop(t + .25); },
+    chat() { const t = ctx.currentTime; ring(t, 1568, .07, .25, [[1, 1], [2, .3]]); ring(t + .09, 2093, .06, .3, [[1, 1], [2, .3]]); },
+    nudge() { const t = ctx.currentTime; for (let i = 0; i < 3; i++) ring(t + i * .22, mtof(88), .12, .8, [[1, 1], [2, .3], [3, .1]]); },
+    tick() { const t = ctx.currentTime; ring(t, 880, .08, .12, [[1, 1]]); },
     points() { const t = ctx.currentTime; [88, 93].forEach((m, i) => ring(t + i * .08, mtof(m), .07, .6, [[1, 1], [2, .25]])); },
     win() { const t = ctx.currentTime; [[62, 0, .35], [69, .3, .35], [74, .6, .35], [78, .9, .35], [81, 1.2, 1.6], [86, 1.2, 1.6]].forEach(([m, s, d]) => brass(t + s, m, d, .1));
       [93, 97, 100, 105, 109].forEach((m, i) => ring(t + 1.3 + i * .12, mtof(m), .06, 1.6)); },
@@ -368,5 +375,5 @@ const FX = (function () {
     c.style.setProperty('--mx', (px * 100).toFixed(0) + '%'); c.style.setProperty('--my', (py * 100).toFixed(0) + '%');
   }, { passive: true });
 
-  return { ctxState: () => ctx && ctx.state, SFX_NAMES: () => Object.keys(SFX), sfx, snapshot, diff, flash, setMusic, setSfx, unlock, state: () => ({ music: musicOn, sfx: sfxOn }), confetti };
+  return { floatText, ctxState: () => ctx && ctx.state, SFX_NAMES: () => Object.keys(SFX), sfx, snapshot, diff, flash, setMusic, setSfx, unlock, state: () => ({ music: musicOn, sfx: sfxOn }), confetti };
 })();

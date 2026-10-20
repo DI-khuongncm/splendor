@@ -96,3 +96,21 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;box-
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
 }
+
+/* ===== bot, chat, đồng hồ, lịch sử ===== */
+.tag.bot{background:#6f8cff;color:#fff}
+.member .x{padding:.1em .55em;font-size:.85rem;margin-left:auto}
+select{font:inherit;padding:.5em .7em;border-radius:8px;border:1px solid var(--line);background:#120f16;color:var(--txt);flex:1}
+.cd{float:right;font-family:var(--serif);font-weight:800;color:#ffe08a;background:#00000055;border:1px solid #d8b25a88;border-radius:999px;padding:.1em .7em;margin-left:8px}
+.cd.urgent{color:#fff;background:#b8332b;border-color:#ff8a80;animation:tagpulse .7s ease-in-out infinite}
+.chat{background:linear-gradient(180deg,#1f1b25,#18151d);border:1px solid var(--line);border-radius:12px;padding:8px}
+.cmsgs{max-height:150px;overflow:auto;font-size:.85rem;color:var(--txt);display:flex;flex-direction:column;gap:3px;margin-bottom:6px}
+.cm{padding:3px 8px;border-radius:8px;background:#ffffff0d;word-break:break-word;animation:slidein .25s ease both}
+.cm b{color:var(--acc);margin-right:4px}.cm.mine{background:#e8b9231f;align-self:flex-end}.cm.emo{font-size:1.2rem}
+.qe{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px}
+.qe button{padding:.2em .5em;font-size:1rem;border-radius:999px}.qe .ph{font-size:.78rem}
+.crow{display:flex;gap:6px}.crow input{padding:.45em .7em}.crow button{padding:.4em .9em}
+.md.wide{max-width:560px}
+.hist{max-height:60vh;overflow:auto;font-size:.88rem;margin:10px 0;padding-right:4px}
+.hist .rh{position:sticky;top:0;background:#2a2431;color:var(--acc);font-family:var(--serif);font-weight:800;letter-spacing:.08em;padding:4px 0;border-bottom:1px solid #d8b25a55;margin-top:8px}
+.hist .hl{padding:3px 0;color:var(--txt);border-bottom:1px solid #ffffff08}

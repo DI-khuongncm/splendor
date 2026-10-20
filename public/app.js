@@ -13,6 +13,10 @@ let modal = null;  // { kind:'card', from, level, index, id } | { kind:'deck', l
 let disc = {};     // đá định bỏ
 let toastMsg = '', toastTimer = 0, lobbyErr = '';
 let lastTurnKey = '', fails = 0;
+let skew = 0, seenChat = null, seenNudge = null, notifyOn = false;
+try { notifyOn = localStorage.getItem('splendor_notify') === '1' && 'Notification' in window && Notification.permission === 'granted'; } catch (e) {}
+const EMO = ['😀', '😂', '😮', '😡', '👏', '🔥'], PHRASES = ['Nhanh lên!', 'GG', 'Khá lắm!', 'Hừm…'];
+const isBotId = (id) => { const m = S && S.lobby.members.find((x) => x.id === id); return !!(m && m.bot); };
 
 // ---------- hình gem (giác cắt nhiều mặt) ----------
 const P = (pts) => pts.map((p) => p.map((v) => +v.toFixed(2)).join(',')).join(' ');
@@ -215,11 +219,35 @@ function connect() {
 }
 function setSess(s) { sess = s; localStorage.setItem('splendor', JSON.stringify(s)); connect(); }
 function onState() {
+  const L = S.lobby; skew = L.now - Date.now();
+  const maxChat = L.chat.length ? L.chat[L.chat.length - 1].i : 0;
+  if (seenChat === null) seenChat = maxChat;
+  else if (maxChat > seenChat) {
+    const fresh = L.chat.filter((c) => c.i > seenChat);
+    seenChat = maxChat;
+    for (const c of fresh) if (c.id !== L.me) {
+      FX.sfx(c.emo ? 'tok' : 'chat');
+      if (S.game && c.emo) setTimeout(() => {
+        const pl = document.querySelector(`.pl[data-pid="${c.id}"]`);
+        if (pl) { const r = pl.getBoundingClientRect(); FX.floatText({ x: r.left, y: r.top, w: r.width, h: 20 }, c.text, 'noble'); }
+      }, 50);
+    }
+  }
+  const nt = L.nudge ? L.nudge.t : 0;
+  if (seenNudge === null) seenNudge = nt;
+  else if (nt > seenNudge) {
+    seenNudge = nt;
+    if (L.nudge.to === L.me) { FX.sfx('nudge'); FX.flash(`${L.nudge.from} đang đợi bạn!`); try { navigator.vibrate && navigator.vibrate([200, 100, 200]); } catch (e) {} }
+  }
   const g = S.game;
   if (!g) { modal = null; return; }
   const key = g.turn + ':' + g.phase + ':' + g.round;
   if (key !== lastTurnKey) {
     lastTurnKey = key; sel = []; disc = {};
+    if (myTurn() && (document.hidden || !document.hasFocus())) {
+      try { navigator.vibrate && navigator.vibrate(150); } catch (e) {}
+      if (notifyOn) try { new Notification('Splendor', { body: 'Đến lượt bạn!', tag: 'splendor-turn' }); } catch (e) {}
+    }
     if (modal && modal.kind !== 'over') modal = null;
   }
   if (g.phase === 'over' && !(modal && modal.kind === 'over') && !modal?.dismissed) modal = { kind: 'over' };
@@ -281,7 +309,11 @@ function renderLobby() {
     <div class="code">${L.code}</div>
     <div class="row"><input readonly value="${esc(link)}" onclick="this.select()"><button class="sec" data-a="copy">Chép</button></div>
     <div class="lbl" style="margin-top:14px">Người chơi (${L.members.length}/4)</div>
-    ${L.members.map((m) => `<div class="member"><span class="dot ${m.online ? 'on' : ''}"></span><b style="flex:1">${esc(m.name)}${m.id === L.me ? ' (bạn)' : ''}</b>${m.id === L.hostId ? '<span class="tag">CHỦ PHÒNG</span>' : ''}</div>`).join('')}
+    ${L.members.map((m) => `<div class="member"><span class="dot ${m.online ? 'on' : ''}"></span><b style="flex:1">${esc(m.name)}${m.id === L.me ? ' (bạn)' : ''}</b>${m.bot ? '<span class="tag bot">MÁY</span>' : ''}${m.id === L.hostId ? '<span class="tag">CHỦ PHÒNG</span>' : ''}${host && m.bot ? `<button class="sec x" data-a="rmbot" data-id="${m.id}" title="Xoá máy">✕</button>` : ''}</div>`).join('')}
+    ${host ? `<div class="lbl" style="margin-top:12px">Thêm máy chơi cùng</div><div class="row" style="flex-wrap:wrap;margin:6px 0">${L.bots.map((b) => `<button class="sec" data-a="addbot" data-s="${b.key}" ${L.members.length >= 4 ? 'disabled' : ''}>+ ${b.name}</button>`).join('')}</div>
+      <div class="row"><span class="lbl" style="flex:none">Đồng hồ lượt</span><select id="timer">${[0, 45, 60, 90, 120, 180].map((t) => `<option value="${t}" ${L.settings.timer === t ? 'selected' : ''}>${t ? t + ' giây' : 'Tắt'}</option>`).join('')}</select></div>`
+      : `<div class="lbl" style="margin-top:10px">Đồng hồ lượt: ${L.settings.timer ? L.settings.timer + ' giây' : 'tắt'}</div>`}
+    ${scoreHtml()}
     <div class="row" style="margin-top:14px">
       ${host ? `<button style="flex:1" data-a="start" ${L.members.length < 2 ? 'disabled' : ''}>Bắt đầu ván</button>` : '<div class="sub" style="flex:1;margin:0">Đợi chủ phòng bắt đầu…</div>'}
       <button class="sec" data-a="leave">Rời</button></div>
@@ -298,7 +330,8 @@ function banner() {
     if (g.phase === 'discard') { t = 'Bạn đang có hơn 10 viên đá'; s = `Hãy bỏ bớt ${total(me().tokens) - 10} viên.`; }
     if (g.phase === 'noble') { t = 'Có nhiều quý tộc muốn đến thăm'; s = 'Bấm vào một quý tộc để chọn.'; }
   } else t = `Lượt của ${esc(p.name)}`, s = g.phase === 'discard' ? 'đang bỏ bớt đá' : g.phase === 'noble' ? 'đang chọn quý tộc' : '';
-  return `<div class="banner ${mine ? 'me' : ''}">${t}${s ? `<small>${s}</small>` : ''}</div>` +
+  const dl = S.lobby.deadline, cd = g.phase !== 'over' && dl && !isBotId(p.id) ? `<span class="cd" data-dl="${dl}"></span>` : '';
+  return `<div class="banner ${mine ? 'me' : ''}">${cd}${t}${s ? `<small>${s}</small>` : ''}</div>` +
     (g.finalRound && g.phase !== 'over' ? `<div class="banner final">⚠ Vòng cuối! Có người đã đạt 15 điểm — chơi hết vòng này.</div>` : '');
 }
 
@@ -362,17 +395,31 @@ function playerHtml(p) {
   return h + '</div>';
 }
 
+function chatHtml() {
+  const L = S.lobby;
+  const msgs = L.chat.map((c) => `<div class="cm ${c.id === L.me ? 'mine' : ''} ${c.emo ? 'emo' : ''}"><b>${esc(c.name)}</b> ${esc(c.text)}</div>`).join('') || '<div class="lbl" style="padding:4px">Chưa có tin nhắn</div>';
+  return `<div class="chat"><div class="cmsgs" id="cmsgs">${msgs}</div>
+    <div class="qe">${EMO.map((e) => `<button class="sec" data-a="emo" data-t="${e}">${e}</button>`).join('')}${PHRASES.map((e) => `<button class="sec ph" data-a="emo" data-t="${e}">${e}</button>`).join('')}</div>
+    <div class="crow"><input id="chatin" maxlength="140" placeholder="Nhắn tin…" autocomplete="off"><button data-a="chatsend">Gửi</button></div></div>`;
+}
+function scoreHtml() {
+  const L = S.lobby, rows = L.members.filter((m) => !m.bot && L.scores[m.id] && L.scores[m.id].g).map((m) => ({ n: m.name, ...L.scores[m.id] }));
+  if (!rows.length) return '';
+  return `<div class="lbl" style="margin-top:12px">Thành tích nhóm</div><table class="score" style="width:100%">${rows.sort((a, b) => b.w - a.w).map((r) => `<tr><td>${esc(r.n)}</td><td>${r.w} thắng</td><td class="lbl">${r.g} ván</td></tr>`).join('')}</table>`;
+}
 function renderGame() {
   const g = S.game;
   const order = [...g.players]; // giữ thứ tự lượt
   return `<div class="wrap">
     <div class="topbar">${banner()}
-      <button class="sec" data-a="help">Luật</button></div>
+      ${g.phase !== 'over' && !myTurn() && !isBotId(cur().id) ? '<button class="sec" data-a="nudge">⏰ Nhắc</button>' : ''}
+      <button class="sec" data-a="history">Lịch sử</button><button class="sec" data-a="help">Luật</button></div>
     <div class="game">
       <div class="table"><div class="board">${boardHtml()}</div>
       <div class="bank">${bankHtml()}${actsHtml()}</div></div>
       <div class="side">${order.map(playerHtml).join('')}
-        <div class="log" id="log">${g.log.map((l) => `<div>${esc(l)}</div>`).join('')}</div>
+        <div class="log" id="log">${g.log.slice(-40).map((l) => `<div>${esc(l.t)}</div>`).join('')}</div>
+        ${chatHtml()}
         <div class="lbl">Phòng ${S.lobby.code} · Vòng ${g.round}</div></div>
     </div></div>`;
 }
@@ -389,13 +436,20 @@ function renderModal() {
     Tối đa 10 viên đá trong tay. Cuối lượt, nếu đủ bonus thì quý tộc (+3) tự đến.<br>
     Ai đạt 15 điểm sẽ kích hoạt vòng cuối; điểm cao nhất thắng (hòa: ít thẻ hơn thắng).</p>
     <div class="mdb"><button data-a="closem">Đóng</button></div></div></div>`;
+  if (modal.kind === 'history') {
+    let h = '', r0 = -1;
+    for (const l of g.log) { if (l.r !== r0) { r0 = l.r; h += `<div class="rh">Vòng ${l.r}</div>`; } h += `<div class="hl">${esc(l.t)}</div>`; }
+    return `<div class="ov" data-a="closem"><div class="md wide" data-stop><h3>Lịch sử nước đi</h3><div class="hist" id="hist">${h}</div>
+      <div class="mdb"><button data-a="closem">Đóng</button></div></div></div>`;
+  }
   if (modal.kind === 'over') {
     const rows = [...g.players].sort((a, b) => b.points - a.points || a.cards.length - b.cards.length);
     const host = S.lobby.hostId === S.lobby.me;
     return `<div class="ov"><div class="md" data-stop><h3 style="text-align:center">🏆 Kết thúc ván</h3>
       <table class="score" style="width:100%;margin:10px 0"><tr><td class="lbl">Người chơi</td><td class="lbl">Điểm</td><td class="lbl">Thẻ</td></tr>
       ${rows.map((p) => `<tr class="${g.winners.includes(p.id) ? 'win' : ''}"><td>${g.winners.includes(p.id) ? '👑 ' : ''}${esc(p.name)}</td><td>${p.points}</td><td>${p.cards.length}</td></tr>`).join('')}</table>
-      <div class="mdb"><button class="sec" data-a="closeover">Xem bàn</button>${host ? '<button data-a="tolobby">Về sảnh chơi lại</button>' : ''}</div></div></div>`;
+      ${scoreHtml()}
+      <div class="mdb"><button class="sec" data-a="closeover">Xem bàn</button>${host ? '<button data-a="rematch">Ván mới</button><button class="sec" data-a="tolobby">Về sảnh</button>' : '<div class="sub" style="flex:1;margin:0">Đợi chủ phòng bắt đầu ván mới…</div>'}</div></div></div>`;
   }
   if (modal.kind === 'deck') return `<div class="ov" data-a="closem"><div class="md" data-stop>
     <h3>Giữ thẻ úp cấp ${modal.level}?</h3><p>Bạn sẽ bốc thẻ trên cùng của chồng (không xem trước ai cũng không thấy trừ bạn) và nhận 1 vàng nếu còn.</p>
@@ -427,19 +481,19 @@ function renderDiscard() {
 
 function sndHtml() {
   const st = FX.state();
-  return `<div class="snd"><button class="${st.music ? '' : 'off'}" data-a="music" title="Nhạc nền">🎵</button><button class="${st.sfx ? '' : 'off'}" data-a="sfx" title="Hiệu ứng âm thanh">🔔</button></div>`;
+  return `<div class="snd"><button class="${st.music ? '' : 'off'}" data-a="music" title="Nhạc nền">🎵</button><button class="${st.sfx ? '' : 'off'}" data-a="sfx" title="Hiệu ứng âm thanh">🔔</button>${'Notification' in window ? `<button class="${notifyOn ? '' : 'off'}" data-a="notif" title="Thông báo khi đến lượt (lúc ở tab khác)">📣</button>` : ''}</div>`;
 }
 function render() {
   const ae = document.activeElement, keep = ae && ae.id ? { id: ae.id, v: ae.value, s: ae.selectionStart } : null;
-  const logTop = document.getElementById('log');
-  const stick = !logTop || logTop.scrollTop + logTop.clientHeight >= logTop.scrollHeight - 10;
+  const IDS = ['log', 'cmsgs'], stick = {};
+  for (const id of IDS) { const e = document.getElementById(id); stick[id] = !e || e.scrollTop + e.clientHeight >= e.scrollHeight - 10; }
   let h;
   if (!sess || !S) h = renderEntry();
   else if (!S.game) h = renderLobby();
   else h = renderGame() + renderModal() + renderDiscard();
   $app.innerHTML = sndHtml() + h + (toastMsg ? `<div class="toast">${esc(toastMsg)}</div>` : '');
   if (keep) { const e = document.getElementById(keep.id); if (e) { e.value = keep.v; e.focus(); try { e.setSelectionRange(keep.s, keep.s); } catch (x) {} } }
-  const lg = document.getElementById('log'); if (lg && stick) lg.scrollTop = lg.scrollHeight;
+  for (const id of [...IDS, 'hist']) { const e = document.getElementById(id); if (e && (id === 'hist' || stick[id])) e.scrollTop = e.scrollHeight; }
 }
 
 // ---------- sự kiện ----------
@@ -462,6 +516,19 @@ $app.addEventListener('click', async (e) => {
       }
       case 'copy': navigator.clipboard && navigator.clipboard.writeText(`${location.origin}/?room=${S.lobby.code}`); showToast('Đã chép link', true); break;
       case 'start': await post('start'); break;
+      case 'addbot': await post('addbot', { style: t.dataset.s }); break;
+      case 'rmbot': await post('rmbot', { id: t.dataset.id }); break;
+      case 'rematch': modal = null; await post('rematch'); break;
+      case 'history': modal = { kind: 'history' }; render(); break;
+      case 'nudge': await post('nudge'); FX.sfx('click'); showToast('Đã nhắc ' + cur().name, true); break;
+      case 'emo': await post('chat', { text: t.dataset.t, emo: true }); break;
+      case 'chatsend': { const el = document.getElementById('chatin'); const txt = el.value.trim(); if (!txt) break; el.value = ''; await post('chat', { text: txt }); break; }
+      case 'notif': {
+        if (notifyOn) { notifyOn = false; localStorage.setItem('splendor_notify', '0'); render(); break; }
+        const r = await Notification.requestPermission();
+        notifyOn = r === 'granted'; localStorage.setItem('splendor_notify', notifyOn ? '1' : '0');
+        showToast(notifyOn ? 'Đã bật thông báo khi đến lượt' : 'Trình duyệt chưa cho phép thông báo', notifyOn); break;
+      }
       case 'leave': try { await post('leave'); } catch (x) {} localStorage.removeItem('splendor'); loopId++; sess = null; S = null; render(); break;
       case 'tolobby': await post('lobby'); modal = null; break;
       case 'music': FX.setMusic(!FX.state().music); render(); break;
@@ -493,6 +560,23 @@ $app.addEventListener('click', async (e) => {
     }
   } catch (err) { if (!sess || !S) { lobbyErr = err.message; render(); } else showToast(err.message); }
 });
+
+$app.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.id === 'chatin') { e.preventDefault(); const b = $app.querySelector('[data-a="chatsend"]'); b && b.click(); }
+});
+$app.addEventListener('change', async (e) => {
+  if (e.target.id === 'timer') { try { await post('settings', { timer: +e.target.value }); } catch (x) { showToast(x.message); } }
+});
+// đồng hồ lượt + nhấp nháy tiêu đề khi ở tab khác
+let blink = 0;
+setInterval(() => {
+  for (const el of document.querySelectorAll('.cd')) {
+    const left = Math.max(0, Math.ceil((+el.dataset.dl - (Date.now() + skew)) / 1000));
+    el.textContent = '⏳ ' + left + 's'; el.classList.toggle('urgent', left <= 10);
+    if (left <= 5 && left > 0 && S && S.game && myTurn()) FX.sfx('tick');
+  }
+  if (S && S.game && myTurn() && document.hidden) document.title = (blink ^= 1) ? '▶ Đến lượt bạn!' : 'Splendor';
+}, 1000);
 
 // ---------- khởi động ----------
 probeArt();

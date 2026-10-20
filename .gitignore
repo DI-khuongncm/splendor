@@ -1,3 +1,4 @@
 *.log
 art-src/
 node_modules/
+data/

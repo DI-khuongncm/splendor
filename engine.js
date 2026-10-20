@@ -48,8 +48,8 @@ function newGame(players, rnd = Math.random) {
 }
 
 function addLog(g, text) {
-  g.log.push(text);
-  if (g.log.length > 80) g.log.shift();
+  g.log.push({ r: g.round, t: text });
+  if (g.log.length > 120) g.log.shift();
 }
 
 function bonuses(p) {
@@ -255,10 +255,10 @@ function viewFor(g, playerId) {
     deckCounts: { 1: g.decks[1].length, 2: g.decks[2].length, 3: g.decks[3].length },
     board: g.board, nobles: g.nobles,
     turn: g.turn, phase: g.phase, finalRound: g.finalRound, winners: g.winners,
-    log: g.log.slice(-40), round: g.round,
+    log: g.log.slice(-120), round: g.round,
     eligible: g.phase === 'noble' && g.players[g.turn].id === playerId ? eligibleNobles(g, g.players[g.turn]) : [],
     canPass: g.phase === 'main' && g.players[g.turn].id === playerId && !canAct(g, g.players[g.turn]),
   };
 }
 
-module.exports = { newGame, apply, viewFor, payment, points, bonuses, canAct, CARDS, NOBLES, COLORS };
+module.exports = { newGame, apply, viewFor, payment, points, bonuses, canAct, eligibleNobles, addLog, availableColors, sum, CARDS, NOBLES, COLORS, MAX_TOKENS, MAX_RESERVED, WIN_POINTS };
