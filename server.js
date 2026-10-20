@@ -245,11 +245,14 @@ async function api(req, res, url) {
         break;
       }
       case '/api/leave': {
-        if (!room.game) {
-          room.members = room.members.filter((x) => x !== m);
-          if (!room.members.some((x) => !x.bot)) rooms.delete(room.code);
-          else if (room.hostId === m.id) room.hostId = room.members.find((x) => !x.bot).id;
-        }
+        // Đang có ván: máy chơi thay người rời để ván vẫn tiếp tục; ở sảnh thì xoá khỏi phòng.
+        if (room.game) {
+          Object.assign(m, { bot: true, style: 'balanced', token: null });
+          for (const f of [...m.waiters]) f();
+          if (room.game.phase !== 'over') engine.addLog(room.game, `🚪 ${m.name} đã rời — máy chơi thay.`);
+        } else room.members = room.members.filter((x) => x !== m);
+        if (!room.members.some((x) => !x.bot)) rooms.delete(room.code);
+        else if (room.hostId === m.id) room.hostId = room.members.find((x) => !x.bot).id;
         break;
       }
       default: return json(res, 404, { error: 'Not found' });

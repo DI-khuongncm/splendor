@@ -446,7 +446,9 @@ function renderGame() {
     <div class="topbar">${banner()}
       ${g.phase !== 'over' && !myTurn() && !isBotId(cur().id) ? '<button class="sec" data-a="nudge">⏰ Nhắc</button>' : ''}
       ${g.phase === 'over' ? '<button data-a="showover">🏆 Kết quả</button>' : ''}
-      <button class="sec" data-a="history">Lịch sử</button><button class="sec" data-a="help">Luật</button></div>
+      <button class="sec" data-a="history">Lịch sử</button><button class="sec" data-a="help">Luật</button>
+      ${S.lobby.hostId === S.lobby.me && g.phase !== 'over' ? '<button class="sec" data-a="abort">Hủy ván</button>' : ''}
+      <button class="bad" data-a="quit">Thoát</button></div>
     <div class="game">
       <div class="table"><div class="board">${boardHtml()}</div>
       <div class="bank">${bankHtml()}${actsHtml()}</div></div>
@@ -646,6 +648,11 @@ $app.addEventListener('click', async (e) => {
       }
       case 'leave': try { await post('leave'); } catch (x) {} localStorage.removeItem('splendor'); loopId++; sess = null; S = null; render(); break;
       case 'tolobby': await post('lobby'); modal = null; break;
+      case 'abort': if (confirm('Hủy ván này và đưa cả phòng về sảnh?')) { await post('lobby'); modal = null; } break;
+      case 'quit': {
+        if (S.game.phase !== 'over' && !confirm('Thoát khỏi phòng? Máy sẽ chơi thay bạn.')) break;
+        try { await post('leave'); } catch (x) {} localStorage.removeItem('splendor'); loopId++; sess = null; S = null; modal = null; render(); break;
+      }
       case 'music': FX.setMusic(!FX.state().music); render(); break;
       case 'sfx': FX.setSfx(!FX.state().sfx); FX.sfx('click'); render(); break;
       case 'help': modal = { kind: 'help' }; render(); break;
