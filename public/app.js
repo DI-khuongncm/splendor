@@ -303,12 +303,12 @@ function nobleProg(n) {
   for (const c of COLORS) if (n.req[c]) { need += n.req[c]; have += Math.min(b[c], n.req[c]); }
   return need ? `<i class="nprog" title="${have}/${need}"><u style="width:${(have / need) * 100}%"></u></i>` : '';
 }
-function nobleHtml(id, pick) {
-  const n = NOBLES[id], pk = `${pick ? 'pick' : ''}" data-nid="${id}" ${pick ? `data-a="noble" data-id="${id}"` : ''}`;
-  if (useImg('n' + id)) return `<div class="noble img ${pk} style="background-image:url(art/n${id}.jpg)">${nobleProg(n)}</div>`;
+function nobleHtml(id, pick, owned) {
+  const n = NOBLES[id], pk = `${pick ? 'pick' : ''}" data-nid="${id}" ${pick ? `data-a="noble" data-id="${id}"` : ''}`, prog = owned ? '' : nobleProg(n);
+  if (useImg('n' + id)) return `<div class="noble img ${pk} style="background-image:url(art/n${id}.jpg)">${prog}</div>`;
   return `<div class="noble nart-${id} ${pk}><div class="nside">
     <span class="np">${n.points}</span>
-    <div class="nr">${COLORS.filter((c) => n.req[c]).map((c) => `<div class="cost ${c}">${n.req[c]}</div>`).join('')}</div></div>${nobleProg(n)}</div>`;
+    <div class="nr">${COLORS.filter((c) => n.req[c]).map((c) => `<div class="cost ${c}">${n.req[c]}</div>`).join('')}</div></div>${prog}</div>`;
 }
 function tokHtml(c, n, extra = '', cls = '', attrs = '') {
   let stk = '';
@@ -409,21 +409,25 @@ function actsHtml() {
     ${g.canPass ? '<button class="bad" data-a="pass">Bỏ lượt</button>' : ''}</div>`;
 }
 
-function playerHtml(p) {
+// Ghế quanh bàn: đá, bài đã mua (xếp chồng theo màu), quý tộc, thẻ đang giữ.
+function playerHtml(p, pos) {
   const g = S.game, isMe = p.id === S.lobby.me, turn = cur().id === p.id && g.phase !== 'over';
   const mem = S.lobby.members.find((m) => m.id === p.id);
   const pi = g.players.indexOf(p), pcol = ['#e8b923', '#4f8be9', '#e24a44', '#3dbd71'][pi % 4];
-  let h = `<div class="pl ${turn ? 'turn' : ''}" data-pid="${p.id}" style="--pc:${pcol}"><div class="hd"><span class="av">${esc(Array.from((p.name || '?').trim())[0].toUpperCase())}</span><span class="dot ${mem && mem.online ? 'on' : ''}"></span>
+  let h = `<div class="pl seat seat-${pos} ${isMe ? 'me' : ''} ${turn ? 'turn' : ''}" data-pid="${p.id}" style="--pc:${pcol}"><div class="hd"><span class="av">${esc(Array.from((p.name || '?').trim())[0].toUpperCase())}</span><span class="dot ${mem && mem.online ? 'on' : ''}"></span>
     <span class="nm">${esc(p.name)}${isMe ? ' (bạn)' : ''}</span>${turn ? '<span class="tag">LƯỢT</span>' : ''}<span class="pt" style="--p:${Math.min(100, (p.points / 15) * 100)}"><b>${p.points}</b></span></div>`;
   h += `<div class="chips">${['white', 'blue', 'green', 'red', 'black', 'gold'].map((c) => p.tokens[c] ? tokHtml(c, p.tokens[c], '', 'mini') : '').join('') || '<span class="lbl">chưa có đá</span>'}</div>`;
-  h += `<div class="bon">${COLORS.map((c) => p.bonuses[c] ? `<span class="bonc k-${c}" title="Bonus ${VI[c]}">${gemSvg(c, 15)}<b>${p.bonuses[c]}</b></span>` : '').join('')}<span class="bonc" title="Số thẻ đã mua">🃏 ${p.cards.length}</span>${p.nobles.length ? `<span class="bonc">👑 ${p.nobles.length}</span>` : ''}</div>`;
-  if (p.reserved.length) {
-    h += `<div class="lbl">Thẻ giữ</div><div class="res">` + p.reserved.map((r) => {
-      if (r.hidden) return backHtml(r.level, null, 'style="cursor:default"').replace('card back', 'card back small');
-      const aff = isMe && myTurn() && g.phase === 'main' && pay(p, CARDS[r.id]);
-      return cardHtml(r.id, isMe ? `data-a="card" data-from="reserved" data-id="${r.id}"` : 'style="cursor:default"', 'small ' + (aff ? 'afford' : ''));
-    }).join('') + '</div>';
-  }
+  const piles = COLORS.map((c) => {
+    const ids = p.cards.filter((id) => CARDS[id].bonus === c); if (!ids.length) return '';
+    const pts = ids.reduce((s, id) => s + CARDS[id].points, 0);
+    return `<span class="pile k-${c}" style="--n:${Math.min(ids.length, 5)}" title="${ids.length} thẻ ${VI[c]}${pts ? ` · ${pts} điểm` : ''}">${gemSvg(c, 18)}<b>${ids.length}</b>${pts ? `<i>${pts}★</i>` : ''}</span>`;
+  }).join('');
+  h += `<div class="bon">${piles || '<span class="lbl">Chưa mua thẻ</span>'}${p.nobles.length ? `<span class="pnob">${p.nobles.map((id) => nobleHtml(id, false, true)).join('')}</span>` : ''}</div>`;
+  h += `<div class="res" title="Thẻ đang giữ (${p.reserved.length}/3)">` + p.reserved.map((r) => {
+    if (r.hidden) return backHtml(r.level, null, 'style="cursor:default"').replace('card back', 'card back small');
+    const aff = isMe && myTurn() && g.phase === 'main' && pay(p, CARDS[r.id]);
+    return cardHtml(r.id, isMe ? `data-a="card" data-from="reserved" data-id="${r.id}"` : 'style="cursor:default"', 'small ' + (aff ? 'afford' : ''));
+  }).join('') + '<div class="card slot"></div>'.repeat(3 - p.reserved.length) + '</div>';
   return h + '</div>';
 }
 
@@ -439,9 +443,11 @@ function scoreHtml() {
   if (!rows.length) return '';
   return `<div class="lbl" style="margin-top:12px">Thành tích nhóm</div><table class="score" style="width:100%">${rows.sort((a, b) => b.w - a.w).map((r) => `<tr><td>${esc(r.n)}</td><td>${r.w} thắng</td><td class="lbl">${r.g} ván</td></tr>`).join('')}</table>`;
 }
+// Mình luôn ngồi góc dưới-trái, những người sau ngồi tiếp theo chiều kim đồng hồ.
+const SEATS = { 2: ['bl', 'tr'], 3: ['bl', 'tl', 'tr'], 4: ['bl', 'tl', 'tr', 'br'] };
 function renderGame() {
-  const g = S.game;
-  const order = [...g.players]; // giữ thứ tự lượt
+  const g = S.game, n = g.players.length, mi = Math.max(0, g.players.findIndex((p) => p.id === S.lobby.me));
+  const seats = g.players.map((_, k) => playerHtml(g.players[(mi + k) % n], SEATS[n][k])).join('');
   return `<div class="wrap">
     <div class="topbar">${banner()}
       ${g.phase !== 'over' && !myTurn() && !isBotId(cur().id) ? '<button class="sec" data-a="nudge">⏰ Nhắc</button>' : ''}
@@ -449,13 +455,13 @@ function renderGame() {
       <button class="sec" data-a="history">Lịch sử</button><button class="sec" data-a="help">Luật</button>
       ${S.lobby.hostId === S.lobby.me && g.phase !== 'over' ? '<button class="sec" data-a="abort">Hủy ván</button>' : ''}
       <button class="bad" data-a="quit">Thoát</button></div>
-    <div class="game">
+    <div class="game seats">${seats}
       <div class="table"><div class="board">${boardHtml()}</div>
       <div class="bank">${bankHtml()}${actsHtml()}</div></div>
-      <div class="side">${order.map(playerHtml).join('')}
-        <div class="log" id="log">${g.log.slice(-40).map((l) => `<div>${esc(l.t)}</div>`).join('')}</div>
-        ${chatHtml()}
-        <div class="lbl">Phòng ${S.lobby.code} · Vòng ${g.round}</div></div>
+      <div class="foot">
+        <div><div class="log" id="log">${g.log.slice(-40).map((l) => `<div>${esc(l.t)}</div>`).join('')}</div>
+        <div class="lbl" style="margin-top:6px">Phòng ${S.lobby.code} · Vòng ${g.round}</div></div>
+        ${chatHtml()}</div>
     </div></div>`;
 }
 
