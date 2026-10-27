@@ -50,7 +50,7 @@ body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:2;box-
   box-shadow:inset 0 0 0 4px #00000022}
 .table::after{content:"✦";position:absolute;left:50%;bottom:2px;transform:translateX(-50%);color:#d8b25a88;font-size:.8rem;letter-spacing:.5em}
 .nobles{padding:2px 0}
-.noble.img,.noble{transition:transform .2s}
+.noble{transition:transform .2s}
 
 /* chồng đá quý */
 .tok{transition:transform .15s,box-shadow .15s,opacity .3s}
